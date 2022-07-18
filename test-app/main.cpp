@@ -69,7 +69,9 @@ int main(int argc, char *argv[])
         qDebug() << it.key();
     }
 
-    char* x = new char;
+    char* x = new char[128];
+
+    strcpy(x, "Hallo Welt");
 
     QFile f("/tmp/test.txt");
     f.open(QIODevice::WriteOnly|QIODevice::ExistingOnly|QIODevice::Append);

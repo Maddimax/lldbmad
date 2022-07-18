@@ -29,12 +29,43 @@ def detectQtVersion(debugger):
 
     return g_qtVersion
 
-
 def check_qt_version(func):
     def inner(*args, **kwargs):
         detectQtVersion(lldb.debugger)
         return func(*args, **kwargs)
     return inner
+
+class qt_version:
+    """Decorator to automatically select the correct version of a function based on the Qt version."""
+
+    # _func_versions is a (global) dictionary of dictionaries.
+    # The outer dictionary is keyed by function name.
+    # The inner dictionary is keyed by the qt version.
+    _func_versions = {}
+
+    # This is the constructor. It is called once for every instance of @qt_version being created.
+    def __init__(self, version):
+        self._version = version
+
+    # This is the decorator function. It is called once for every instance of @qt_version being used.
+    def __call__(self, func):
+        # If we haven't seen this function yet, add it to the dictionary.
+        if not func.__name__ in self._func_versions:
+            self._func_versions[func.__name__] = {}
+
+        # Add the function to the dictionary.
+        self._func_versions[func.__name__][self._version] = func
+
+        # This is the wrapper function that is actually called.
+        def wrapped(*args, **kwargs):
+            v = detectQtVersion(lldb.debugger)
+            # func.__name__ is captured once when __call__ is called.
+
+            if not v[0] in self._func_versions[func.__name__]:
+                raise Exception('"%s" is not implemented for Qt version %s' % (func.__name__, v[0]))
+
+            return self._func_versions[func.__name__][v[0]](*args, **kwargs)
+        return wrapped
 
 class QListChildProvider:
     def __init__(self, valobj, internal_dict):
@@ -212,16 +243,27 @@ def qfile_summary(valobj: lldb.SBValue, idict, options):
     return "{filename=%s, openmode=%s, error=%s}" % (fileNameSummary.strip('u"'), '|'.join(lOpenMode), error)
 
 @output_exceptions
-@check_qt_version
+@qt_version(6)
 def qstring_summary(valobj: lldb.SBValue, idict, options):
     d = valobj.GetNonSyntheticValue().GetChildMemberWithName('d')
     size = d.GetChildMemberWithName('size').unsigned
     ptr = d.GetChildMemberWithName('ptr')
 
     if size == 0:
-        return '(size=0) ""'
+        return '""'
 
     return '"%s"' % (ptr.summary.strip('u"'))
+
+
+@output_exceptions
+@qt_version(5)
+def qstring_summary(valobj: lldb.SBValue, idict, options):
+    type = valobj.GetType().GetBasicType(lldb.eBasicTypeChar16)
+    d = valobj.GetNonSyntheticValue().GetChildMemberWithName('d')
+    addr = d.AddressOf().Dereference().unsigned
+    offset = d.GetChildMemberWithName('offset').unsigned
+    ptr = valobj.CreateValueFromAddress('test', addr+offset, type)
+    return '"%s"' % ptr.AddressOf().summary.strip('u"')
 
 class QStringProvider:
     def __init__(self, valobj, idict):
@@ -233,6 +275,7 @@ class QStringProvider:
     def num_children(self):
         return 3
 
+    @qt_version(6)
     def get_child_at_index(self, index):
         if index == 0:
             return self.valobj.GetChildMemberWithName('d').GetChildMemberWithName('size')
@@ -242,6 +285,22 @@ class QStringProvider:
             return self.valobj.GetChildMemberWithName('d').GetChildMemberWithName('d')
         return None
     
+    @qt_version(5)
+    def get_child_at_index(self, index):
+        if index == 0:
+            return self.valobj.GetChildMemberWithName('d').GetChildMemberWithName('size')
+
+        if index == 1:
+            type = self.valobj.GetType().GetBasicType(lldb.eBasicTypeChar16)
+
+            d = self.valobj.GetChildMemberWithName('d')
+            addr = d.AddressOf().Dereference().unsigned
+            offset = d.GetChildMemberWithName('offset').unsigned
+            ptr = self.valobj.CreateValueFromAddress('ptr', addr+offset, type).AddressOf()
+            return ptr
+
+        return self.valobj.GetChildMemberWithName('d')
+
     def update(self):
         pass
 
