@@ -17,6 +17,8 @@ int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
 
+    float floatValue = 1.0f;
+
     QStringList test({"Hallo", "Welt"});
 
     std::vector<QString> testVector{"Hallo", "Welt"};

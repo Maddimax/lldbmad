@@ -214,14 +214,37 @@ def qfile_summary(valobj: lldb.SBValue, idict, options):
 @output_exceptions
 @check_qt_version
 def qstring_summary(valobj: lldb.SBValue, idict, options):
-    d = valobj.GetChildMemberWithName('d')
+    d = valobj.GetNonSyntheticValue().GetChildMemberWithName('d')
     size = d.GetChildMemberWithName('size').unsigned
     ptr = d.GetChildMemberWithName('ptr')
 
     if size == 0:
         return '(size=0) ""'
 
-    return '(size=%i) "%s"' % (size, ptr.summary.strip('u"'))
+    return '"%s"' % (ptr.summary.strip('u"'))
+
+class QStringProvider:
+    def __init__(self, valobj, idict):
+        self.valobj = valobj
+
+    def hasChildren(self):
+        return True
+
+    def num_children(self):
+        return 3
+
+    def get_child_at_index(self, index):
+        if index == 0:
+            return self.valobj.GetChildMemberWithName('d').GetChildMemberWithName('size')
+        if index == 1:
+            return self.valobj.GetChildMemberWithName('d').GetChildMemberWithName('ptr')
+        if index == 2:
+            return self.valobj.GetChildMemberWithName('d').GetChildMemberWithName('d')
+        return None
+    
+    def update(self):
+        pass
+
 
 @output_exceptions
 @check_qt_version
@@ -245,7 +268,6 @@ def qtextcursor_summary(valobj: lldb.SBValue, idict, options):
     anchor = priv.GetChildMemberWithName('anchor').unsigned
     return "{pos=%i, anchor=%i}" % (pos, anchor)
 
-
 # QMap is just a wrapper for std::map<>, so we just return the internal map here as the sole child
 class QMapChildProvider:
     def __init__(self, valobj, idict):
@@ -255,14 +277,19 @@ class QMapChildProvider:
         return True
     
     def num_children(self):
-        return 1
+        return self.m.GetNumChildren()
     
+    @output_exceptions
     def get_child_at_index(self, index):
-        return self.m
-    
+        syntheticChild = self.m.GetChildAtIndex(index, lldb.eDynamicCanRunTarget, True)
+        key = syntheticChild.GetChildMemberWithName('first').GetSummary()
+        child = self.m.CreateValueFromData('[%s]' % key, syntheticChild.GetData(), syntheticChild.GetType())
+        return child
+
     def update(self):
         try:
             self.m = self.valobj.GetChildMemberWithName('d').GetChildMemberWithName('d').GetChildMemberWithName('m')
+            self.m.SetPreferSyntheticValue(True)
         except:
             pass
 
@@ -280,6 +307,7 @@ def __lldb_init_module(debugger, dict):
     debugger.HandleCommand('type summary   add QFileInfo --summary-string "${var.d_ptr.d.fileEntry.m_filePath}"')
     
     debugger.HandleCommand('type summary   add -w MAD QString -F lldbmad.qstring_summary')
+    debugger.HandleCommand('type synthetic add -w MAD QString  --python-class lldbmad.QStringProvider')
     
     debugger.HandleCommand('type summary   add -w MAD --summary-string "size=${var.d.size}" QByteArray')
 
