@@ -12,6 +12,8 @@
 #include <QPair>
 #include <QUrl>
 
+#include <QStringView>
+
 #include <vector>
 
 int main(int argc, char *argv[])
@@ -83,6 +85,10 @@ int main(int argc, char *argv[])
     QUrl userPortUrl("http://user:pass@127.0.0.1:8888/admin");
 
     qDebug() << test;
+
+    
+    QStringView sv(floatString);
+    QStringView svMid = sv.mid(4); 
 
     //QObjectPrivate
 

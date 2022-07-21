@@ -379,6 +379,14 @@ class QMapChildProvider:
         except:
             pass
 
+@output_exceptions
+def qstringview_summary(valobj: lldb.SBValue, idict, options):
+    type = valobj.GetType().GetBasicType(lldb.eBasicTypeChar16)
+    data = valobj.GetNonSyntheticValue().GetChildMemberWithName('m_data')
+
+    addr = data.AddressOf().Dereference().unsigned
+    ptr = valobj.CreateValueFromAddress('test', addr, type)
+    return '"%s"' % stringFromSummary(ptr.AddressOf().summary)
 
 
 def __lldb_init_module(debugger, dict):
@@ -394,6 +402,8 @@ def __lldb_init_module(debugger, dict):
     
     debugger.HandleCommand('type summary   add -w MAD QUrl -F lldbmad.qurl_summary')
     
+    debugger.HandleCommand('type summary   add -w MAD QStringView -F lldbmad.qstringview_summary')
+
     debugger.HandleCommand('type summary   add -w MAD QString -F lldbmad.qstring_summary')
     debugger.HandleCommand('type synthetic add -w MAD QString  --python-class lldbmad.QStringProvider')
     
