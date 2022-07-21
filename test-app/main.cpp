@@ -10,6 +10,7 @@
 #include <QHash>
 #include <QFile>
 #include <QPair>
+#include <QUrl>
 
 #include <vector>
 
@@ -75,6 +76,11 @@ int main(int argc, char *argv[])
 
     QFile f("/tmp/test.txt");
     f.open(QIODevice::WriteOnly|QIODevice::ExistingOnly|QIODevice::Append);
+
+    QUrl url("http://www.google.de");
+    QUrl fileUrl = QUrl::fromLocalFile("/tmp/test.txt");
+    QUrl portUrl("http://127.0.0.1:8888/admin");
+    QUrl userPortUrl("http://user:pass@127.0.0.1:8888/admin");
 
     qDebug() << test;
 

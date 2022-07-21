@@ -269,6 +269,28 @@ def qstring_summary(valobj: lldb.SBValue, idict, options):
     ptr = valobj.CreateValueFromAddress('test', addr+offset, type)
     return '"%s"' % stringFromSummary(ptr.AddressOf().summary)
 
+@output_exceptions
+def qurl_summary(valobj: lldb.SBValue, idict, options):
+    target = lldb.debugger.GetSelectedTarget()
+    tUrlPrivate = target.FindFirstType("QUrlPrivate")
+
+    d = valobj.GetNonSyntheticValue().GetChildMemberWithName('d')
+    dUrlPrivate = d.CreateChildAtOffset("urlprivate", 0, tUrlPrivate)
+
+    scheme = dUrlPrivate.GetChildMemberWithName('scheme').summary.strip('"')
+    host = dUrlPrivate.GetChildMemberWithName('host').summary.strip('"')
+    path = dUrlPrivate.GetChildMemberWithName('path').summary.strip('"')
+    port = dUrlPrivate.GetChildMemberWithName('port').signed
+    user = dUrlPrivate.GetChildMemberWithName('userName').summary.strip('"')
+    password = dUrlPrivate.GetChildMemberWithName('password').summary.strip('"')
+
+    summary = scheme + '://'
+    summary += user + ':' + password + '@' if user else ''
+    summary += host if host else ''
+    summary += ':%i' % port if port > 0 else ''
+    summary += path if path else ''
+
+    return '"%s"' % summary
 
 class QStringProvider:
     def __init__(self, valobj, idict):
@@ -368,7 +390,9 @@ def __lldb_init_module(debugger, dict):
 
     debugger.HandleCommand('type summary   add -w MAD QFile -F lldbmad.qfile_summary')
     
-    debugger.HandleCommand('type summary   add QFileInfo --summary-string "${var.d_ptr.d.fileEntry.m_filePath}"')
+    debugger.HandleCommand('type summary   add -w MAD QFileInfo --summary-string "${var.d_ptr.d.fileEntry.m_filePath}"')
+    
+    debugger.HandleCommand('type summary   add -w MAD QUrl -F lldbmad.qurl_summary')
     
     debugger.HandleCommand('type summary   add -w MAD QString -F lldbmad.qstring_summary')
     debugger.HandleCommand('type synthetic add -w MAD QString  --python-class lldbmad.QStringProvider')
