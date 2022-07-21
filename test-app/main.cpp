@@ -90,6 +90,8 @@ int main(int argc, char *argv[])
     QStringView sv(floatString);
     QStringView svMid = sv.mid(4); 
 
+    QStringView svLeft = sv.left(4);
+
     //QObjectPrivate
 
     qVersion();

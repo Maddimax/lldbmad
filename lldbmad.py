@@ -1,3 +1,4 @@
+import math
 import traceback
 import lldb
 import pdb
@@ -383,11 +384,14 @@ class QMapChildProvider:
 def qstringview_summary(valobj: lldb.SBValue, idict, options):
     type = valobj.GetType().GetBasicType(lldb.eBasicTypeChar16)
     data = valobj.GetNonSyntheticValue().GetChildMemberWithName('m_data')
+    size = valobj.GetNonSyntheticValue().GetChildMemberWithName('m_size').signed
+
+    size = max(size, 0)
 
     addr = data.AddressOf().Dereference().unsigned
     ptr = valobj.CreateValueFromAddress('test', addr, type)
-    return '"%s"' % stringFromSummary(ptr.AddressOf().summary)
 
+    return '"%s"' % stringFromSummary(ptr.AddressOf().summary)[:size]
 
 def __lldb_init_module(debugger, dict):
     print("Loading MAD extensions...")
