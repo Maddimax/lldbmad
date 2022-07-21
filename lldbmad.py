@@ -4,6 +4,10 @@ import pdb
 
 g_qtVersion = None
 
+def stringFromSummary(summary):
+    result = summary.strip('u')
+    return result.strip('"')
+
 def splitVersion(version):
     return tuple(map(int, version.split('.')))    
 
@@ -240,7 +244,7 @@ def qfile_summary(valobj: lldb.SBValue, idict, options):
             if (1 << i) & openMode:
                 lOpenMode.append(oModeFields[i])
 
-    return "{filename=%s, openmode=%s, error=%s}" % (fileNameSummary.strip('u"'), '|'.join(lOpenMode), error)
+    return "{filename=%s, openmode=%s, error=%s}" % (stringFromSummary(fileNameSummary), '|'.join(lOpenMode), error)
 
 @output_exceptions
 @qt_version(6)
@@ -252,7 +256,7 @@ def qstring_summary(valobj: lldb.SBValue, idict, options):
     if size == 0:
         return '""'
 
-    return '"%s"' % (ptr.summary.strip('u"'))
+    return '"%s"' % (stringFromSummary(ptr.summary))
 
 
 @output_exceptions
@@ -263,7 +267,8 @@ def qstring_summary(valobj: lldb.SBValue, idict, options):
     addr = d.AddressOf().Dereference().unsigned
     offset = d.GetChildMemberWithName('offset').unsigned
     ptr = valobj.CreateValueFromAddress('test', addr+offset, type)
-    return '"%s"' % ptr.AddressOf().summary.strip('u"')
+    return '"%s"' % stringFromSummary(ptr.AddressOf().summary)
+
 
 class QStringProvider:
     def __init__(self, valobj, idict):
