@@ -9,8 +9,11 @@
 #include <memory>
 #include <QHash>
 #include <QFile>
+#include <QFileInfo>
 #include <QPair>
 #include <QUrl>
+#include <QTextCursor>
+#include <QTextDocument>
 
 #include <QStringView>
 
@@ -79,6 +82,8 @@ int main(int argc, char *argv[])
     QFile f("/tmp/test.txt");
     f.open(QIODevice::WriteOnly|QIODevice::ExistingOnly|QIODevice::Append);
 
+    QFileInfo fInfo("/tmp/test.txt");
+
     QUrl url("http://www.google.de");
     QUrl fileUrl = QUrl::fromLocalFile("/tmp/test.txt");
     QUrl portUrl("http://127.0.0.1:8888/admin");
@@ -94,7 +99,14 @@ int main(int argc, char *argv[])
 
     //QObjectPrivate
 
+    QTextDocument doc;
+    doc.setHtml("<p>Hallo Welt</p>");
+
+    QTextCursor cursor(&doc);
+    cursor.setPosition(2);
+    cursor.movePosition(QTextCursor::MoveOperation::Right, QTextCursor::KeepAnchor, 10);
+
     qVersion();
 
-    return a.exec();    
+    return a.exec();
 }

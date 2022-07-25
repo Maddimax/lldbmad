@@ -2,6 +2,7 @@ import math
 import traceback
 import lldb
 import pdb
+from functools import wraps
 
 g_qtVersion = None
 
@@ -13,6 +14,7 @@ def splitVersion(version):
     return tuple(map(int, version.split('.')))    
 
 def output_exceptions(func):
+    @wraps(func)
     def inner(*args, **kwargs):
         try:
             return func(*args, **kwargs)
@@ -33,12 +35,6 @@ def detectQtVersion(debugger):
             print("Detected Qt Version:", g_qtVersion)
 
     return g_qtVersion
-
-def check_qt_version(func):
-    def inner(*args, **kwargs):
-        detectQtVersion(lldb.debugger)
-        return func(*args, **kwargs)
-    return inner
 
 class qt_version:
     """Decorator to automatically select the correct version of a function based on the Qt version."""
@@ -62,6 +58,7 @@ class qt_version:
         self._func_versions[func.__name__][self._version] = func
 
         # This is the wrapper function that is actually called.
+        @wraps(func)
         def wrapped(*args, **kwargs):
             v = detectQtVersion(lldb.debugger)
             # func.__name__ is captured once when __call__ is called.
@@ -167,7 +164,6 @@ class QVariantChildProvider:
             pass
 
 @output_exceptions
-@check_qt_version
 def qcoreapplication_summary(valobj, idict, options):
     d = valobj.GetChildMemberWithName('d_ptr').GetChildMemberWithName('d').Dereference()
     argc = d.GetChildMemberWithName('argc').Dereference().unsigned
@@ -176,15 +172,12 @@ def qcoreapplication_summary(valobj, idict, options):
     return "{%s}"%' '.join(args)
 
 @output_exceptions
-@check_qt_version
 def qobject_summary(valobj, idict, options):
     extraData = valobj.GetNonSyntheticValue().GetValueForExpressionPath('.d_ptr.d' ).Dereference().GetChildMemberWithName('extraData')# '((QObjectPrivate*).d_ptr.d).extraData.objectName.val')
-    
     if extraData.unsigned != 0:
         objName = extraData.Dereference().GetChildMemberWithName('objectName')
-        val = objName.GetValueForExpressionPath('.val.d.ptr')
-        if val.unsigned != 0:
-            return "{%s}" % val.summary.strip('u')
+        if objName.summary != None:
+            return "{%s}" % objName.summary
 
     return ""
 
@@ -223,14 +216,13 @@ class QObjectChildProvider:
             pass
 
 @output_exceptions
-@check_qt_version
 def qfile_summary(valobj: lldb.SBValue, idict, options):
     target = lldb.debugger.GetSelectedTarget()
     tFilePrivate = target.FindFirstType("QFilePrivate")
 
     d = valobj.GetValueForExpressionPath('->d_ptr.d' )
     dFilePrivate = d.CreateChildAtOffset("fileprivate", 0, tFilePrivate)
-    fileName = dFilePrivate.GetValueForExpressionPath('.fileName.d.ptr')
+    fileName = dFilePrivate.GetValueForExpressionPath('.fileName')
     fileNameSummary = fileName.summary if fileName.summary else ""
     openMode = dFilePrivate.GetValueForExpressionPath('.openMode.i')
     error = dFilePrivate.GetValueForExpressionPath('.error').value
@@ -268,6 +260,7 @@ def qstring_summary(valobj: lldb.SBValue, idict, options):
     addr = d.AddressOf().Dereference().unsigned
     offset = d.GetChildMemberWithName('offset').unsigned
     ptr = valobj.CreateValueFromAddress('test', addr+offset, type)
+
     return '"%s"' % stringFromSummary(ptr.AddressOf().summary)
 
 @output_exceptions
@@ -334,14 +327,12 @@ class QStringProvider:
 
 
 @output_exceptions
-@check_qt_version
 def envpair_summary(valobj: lldb.SBValue, idict, options):
     key = valobj.GetChildMemberWithName('first').GetChildMemberWithName('name').summary
     value = valobj.GetChildMemberWithName('second').GetChildMemberWithName('first').summary
     return "{%s => %s}" % (key, value)
 
 @output_exceptions
-@check_qt_version
 def qtextcursor_summary(valobj: lldb.SBValue, idict, options):
     target = lldb.debugger.GetSelectedTarget()
     tPrivate = target.FindFirstType("QTextCursorPrivate")
@@ -393,48 +384,77 @@ def qstringview_summary(valobj: lldb.SBValue, idict, options):
 
     return '"%s"' % stringFromSummary(ptr.AddressOf().summary)[:size]
 
+@output_exceptions
+def registerTypeSummary(category, typeName, functionOrString, typeNameIsRegularExpression=False, options=None):
+    '''Register a summary provider for a type.'''
+    typeSpecifier = lldb.SBTypeNameSpecifier(typeName, typeNameIsRegularExpression)
+    if isinstance(functionOrString, str):
+        summary = lldb.SBTypeSummary().CreateWithSummaryString(functionOrString)
+    else:
+        summary = lldb.SBTypeSummary().CreateWithFunctionName("%s.%s" %(__name__, functionOrString.__name__))
+    if options:
+        summary.SetOptions(options)
+    
+    category.AddTypeSummary(typeSpecifier, summary)
+    #print("%s => %s" % (typeSpecifier, summary))
+    return summary
+
+@output_exceptions
+def registerTypeSynthetic(category, typeName, cls, typeNameIsRegularExpression=False):
+    '''Register a synthetic provider for a type.'''
+    typeSpecifier = lldb.SBTypeNameSpecifier(typeName, typeNameIsRegularExpression)
+    typeSynthetic = lldb.SBTypeSynthetic().CreateWithClassName("%s.%s" %(__name__, cls.__name__))
+    category.AddTypeSynthetic(typeSpecifier, typeSynthetic)
+    #print("%s => %s" % (typeSpecifier, typeSynthetic))
+    return typeSynthetic
+
+
+@output_exceptions
 def __lldb_init_module(debugger, dict):
     print("Loading MAD extensions...")
-    debugger.HandleCommand('type category  define MAD')
 
-    debugger.HandleCommand('type summary   add -w MAD QObject --expand -F lldbmad.qobject_summary')
-    debugger.HandleCommand('type synthetic add -w MAD QObject --python-class lldbmad.QObjectChildProvider')
+    ################################################################################
+    # Qt Extensions
 
-    debugger.HandleCommand('type summary   add -w MAD QFile -F lldbmad.qfile_summary')
-    
-    debugger.HandleCommand('type summary   add -w MAD QFileInfo --summary-string "${var.d_ptr.d.fileEntry.m_filePath}"')
-    
-    debugger.HandleCommand('type summary   add -w MAD QUrl -F lldbmad.qurl_summary')
-    
-    debugger.HandleCommand('type summary   add -w MAD QStringView -F lldbmad.qstringview_summary')
+    madCategory = debugger.CreateCategory('MAD')
+    madCategory.SetEnabled(True)
 
-    debugger.HandleCommand('type summary   add -w MAD QString -F lldbmad.qstring_summary')
-    debugger.HandleCommand('type synthetic add -w MAD QString  --python-class lldbmad.QStringProvider')
-    
-    debugger.HandleCommand('type summary   add -w MAD --summary-string "size=${var.d.size}" QByteArray')
+    registerTypeSummary(madCategory, "QString", qstring_summary)
+    registerTypeSynthetic(madCategory, "QString", QStringProvider)
 
-    debugger.HandleCommand('type summary   add -w MAD QTextCursor -F lldbmad.qtextcursor_summary')
+    registerTypeSummary(madCategory, "QObject", qobject_summary)
+    registerTypeSynthetic(madCategory, "QObject", QObjectChildProvider)
 
-    debugger.HandleCommand('type summary   add -w MAD -x "^QList<.+>$" --expand --summary-string "size=${svar%#}"')
-    debugger.HandleCommand('type synthetic add -w MAD -x "^QList<.+>$" --python-class lldbmad.QListChildProvider')
-    
-    debugger.HandleCommand('type synthetic add -w MAD -l lldbmad.QVariantChildProvider QVariant')
-    debugger.HandleCommand('type summary   add -w MAD --inline-children QVariant')
+    registerTypeSummary(madCategory, "QFile", qfile_summary)
 
-    debugger.HandleCommand('type summary   add -w MAD -x "^Q.*Application$" -F lldbmad.qcoreapplication_summary')
+    registerTypeSummary(madCategory, "QFileInfo", "${var.d_ptr.d.fileEntry.m_filePath}")
 
-    debugger.HandleCommand('type summary   add -w MAD --summary-string "${var.d.d.m}" -x "^QMap<.+>$"')
-    debugger.HandleCommand('type synthetic add -w MAD -l lldbmad.QMapChildProvider -x "^QMap<.+>$"')
+    registerTypeSummary(madCategory, "QUrl", qurl_summary)
 
-    debugger.HandleCommand('type category  enable MAD')
+    registerTypeSummary(madCategory, "QStringView", qstringview_summary)
 
-    debugger.HandleCommand('type category  define QTC')
+    registerTypeSummary(madCategory, "QByteArray", "size=${var.d.size}")
 
-    debugger.HandleCommand('type summary   add -w QTC -x "^std::__[[:alnum:]]+::pair<const Utils::DictKey, std::__[[:alnum:]]+::pair<QString, bool> >" -F lldbmad.envpair_summary')
+    registerTypeSummary(madCategory, "QTextCursor", qtextcursor_summary)
 
-    debugger.HandleCommand('type summary   add -w QTC "Utils::FilePath" --summary-string "${var.m_data}"')
+    registerTypeSummary(madCategory, "^QList<.+>$", "size=${svar%#}", True)
+    registerTypeSynthetic(madCategory, "^QList<.+>$", QListChildProvider, True)
 
-    debugger.HandleCommand('type category  enable QTC')
+    registerTypeSummary(madCategory, "QVariant", "<placeholder>", False, lldb.eTypeOptionShowOneLiner)
+    registerTypeSynthetic(madCategory, "QVariant", QVariantChildProvider)
 
-    debugger.HandleCommand('settings set target.process.thread.step-avoid-regexp "^(std::|boost::shared_ptr|QStringBuilder)"')
+    registerTypeSummary(madCategory, "^Q.*Application$", qcoreapplication_summary, True)
+
+    registerTypeSummary(madCategory, "^QMap<.+>$",  "${var.d.d.m}", True)
+    registerTypeSynthetic(madCategory, "^QMap<.+>$", QMapChildProvider, True)
+
+    ################################################################################
+    # Qt Creator extensions
+
+    qtcCategory = debugger.CreateCategory('QTC')
+    qtcCategory.SetEnabled(True)
+
+    registerTypeSummary(qtcCategory, "^std::__[[:alnum:]]+::pair<const Utils::DictKey, std::__[[:alnum:]]+::pair<QString, bool> >", envpair_summary, True)
+
+    registerTypeSummary(qtcCategory, "Utils::FilePath", "${var.m_scheme},${var.m_host},${var.m_data}")
 
