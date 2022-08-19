@@ -1,0 +1,31 @@
+FROM ubuntu:22.04
+
+RUN apt-get update
+RUN apt-get install -y qt6-base-dev
+RUN apt-get install -y ninja-build lldb cmake python3-lldb clang
+RUN apt-get install -y libgl1-mesa-dev
+RUN apt-get install -y qt6-base-private-dev
+RUN apt-get install -y lsb-release gnupg
+
+RUN mkdir /build
+
+# Workaround for broken packages 
+RUN mkdir -p /usr/lib/local/lib/python3.10/
+RUN ln -s /usr/lib/llvm-14/lib/python3.10/dist-packages /usr/lib/local/lib/python3.10/dist-packages
+
+# Install debug symbols
+RUN echo "deb http://ddebs.ubuntu.com $(lsb_release -cs) main restricted universe multiverse \
+          deb http://ddebs.ubuntu.com $(lsb_release -cs)-updates main restricted universe multiverse \
+          deb http://ddebs.ubuntu.com $(lsb_release -cs)-proposed main restricted universe multiverse" | \
+          tee -a /etc/apt/sources.list.d/ddebs.list
+
+RUN apt-get install -y ubuntu-dbgsym-keyring
+RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys F2EDC64DC5AEE1F6B9C621F0C8CAB6595FDFF622
+RUN apt-get update
+
+RUN apt-get install -y libqt6core6-dbgsym
+
+
+WORKDIR /build
+
+CMD cmake /src -GNinja -DCMAKE_BUILD_TYPE=Debug && ninja check

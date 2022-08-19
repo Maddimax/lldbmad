@@ -17,6 +17,10 @@ To run tests execute:
 To run the tests in docker:
 
 ```
-docker build . -t lldbmad
-docker run --privileged -it --rm -v $PWD:/src lldbmad
+docker build . -f Dockerfile-ubuntu-qt6 -t lldbmad-ubuntu-qt6
+docker run --privileged -it --rm -v $PWD:/src lldbmad-ubuntu-qt6
 ```
+
+> You NEED to run "--privileged", otherwise lldb will fail to attach to the process with `error: 'A' packet returned an error: 8`
+
+> The Alpine Docker currently fails the checks, since the debug symbols for private classes are missing. If you have any idea how to get them, please open an Issue
