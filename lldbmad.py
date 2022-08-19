@@ -7,6 +7,10 @@ from functools import wraps
 g_qtVersion = None
 
 def stringFromSummary(summary):
+    #print("Summary: ((%s))" % summary)
+    if summary == "unable to read data":
+        return None
+    
     result = summary.strip('u')
     return result.strip('"')
 
@@ -255,7 +259,10 @@ def qstring_summary(valobj: lldb.SBValue, idict, options):
     if size == 0:
         return '""'
 
-    return '"%s"' % (stringFromSummary(ptr.summary))
+    s = stringFromSummary(ptr.summary)
+    if s:
+        return '"%s"' % (s)
+    return None
 
 
 @output_exceptions
