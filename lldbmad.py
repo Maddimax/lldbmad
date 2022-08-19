@@ -291,6 +291,8 @@ def qurl_summary(valobj: lldb.SBValue, idict, options):
     port = dUrlPrivate.GetChildMemberWithName('port').signed
     user = (dUrlPrivate.GetChildMemberWithName('userName').summary or "").strip('"')
     password = (dUrlPrivate.GetChildMemberWithName('password').summary or "").strip('"')
+    query = (dUrlPrivate.GetChildMemberWithName('query').summary or "").strip('"')
+    fragment = (dUrlPrivate.GetChildMemberWithName('fragment').summary or "").strip('"')
 
     if any([scheme, host, path, port, user, password]):
         summary = scheme + '://' if scheme else ''
@@ -298,6 +300,8 @@ def qurl_summary(valobj: lldb.SBValue, idict, options):
         summary += host if host else ''
         summary += ':%i' % port if port > 0 else ''
         summary += path if path else ''
+        summary += "?%s" % query if query else ''
+        summary += "#%s" % fragment if fragment else ''
     else:
         return None
 
@@ -331,11 +335,13 @@ class QUrlProvider:
 
         self.children = list(filter(lambda child: child.GetError().Success(), [
             self.dUrlPrivate.GetChildMemberWithName('scheme'),
-            self.dUrlPrivate.GetChildMemberWithName('host'),
-            self.dUrlPrivate.GetChildMemberWithName('path'),
-            self.dUrlPrivate.GetChildMemberWithName('port'),
             self.dUrlPrivate.GetChildMemberWithName('userName'),
             self.dUrlPrivate.GetChildMemberWithName('password'),
+            self.dUrlPrivate.GetChildMemberWithName('host'),
+            self.dUrlPrivate.GetChildMemberWithName('port'),
+            self.dUrlPrivate.GetChildMemberWithName('path'),
+            self.dUrlPrivate.GetChildMemberWithName('query'),
+            self.dUrlPrivate.GetChildMemberWithName('fragment'),
         ]))
 
 
