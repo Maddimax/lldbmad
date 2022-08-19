@@ -1,3 +1,4 @@
+import sys
 from lldb import debugger
 import os
 
@@ -38,7 +39,7 @@ def CHECK_SUMMARY(expression, expected_summary):
         check(value, expression, expected_summary)
         print('\t\tPASSED')
     except Exception as e:
-        print(e)
+        print(e, flush=True)
         os._exit(1)
 
 def CHECK_CHILDREN(expression, expected_children):
@@ -51,7 +52,7 @@ def CHECK_CHILDREN(expression, expected_children):
         check(value, expression, expected_children)
         print('\t\tPASSED')
     except Exception as e:
-        print(e)
+        print(e, flush=True)
         os._exit(1)
 
 def CHECK(expression, expected_summary, expected_children):
@@ -76,7 +77,7 @@ def read_source():
 
 read_source()
 
-
 debugger.HandleCommand('r')
 
 #debugger.HandleCommand('exit')
+

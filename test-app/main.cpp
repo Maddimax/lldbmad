@@ -155,7 +155,7 @@ void qList()
     // CHECK_SUMMARY("empty", 'size=0');
 
     QList<int> someInts{1,2,3,4};
-    // CHECK("someInts", 'size=4', {'[0]': 1, '[1]': 5, '[2]': 3, '[3]': 4})
+    // CHECK("someInts", 'size=4', {'[0]': 1, '[1]': 2, '[2]': 3, '[3]': 4})
 }
 
 int main(int argc, char *argv[])
