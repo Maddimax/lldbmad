@@ -430,6 +430,84 @@ def qstringview_summary(valobj: lldb.SBValue, idict, options):
     return '"%s"' % stringFromSummary(ptr.AddressOf().summary)[:size]
 
 @output_exceptions
+def qjsonarray_summary(valobj: lldb.SBValue, idict, options):
+    target = lldb.debugger.GetSelectedTarget()
+    tPrivate = target.FindFirstType("QCborContainerPrivate")
+    d = valobj.GetNonSyntheticValue().GetChildMemberWithName('a').GetChildMemberWithName('d')
+    dc = d.CreateChildAtOffset('[private]', 0, tPrivate);
+    elements = dc.GetChildMemberWithName('elements')
+    elements.SetPreferSyntheticValue(True)
+
+    numElements = elements.GetNumChildren()
+    return "size=%i" % numElements
+
+class JsonArrayChildProvider:
+    def __init__(self, valobj, idict):
+        self.valobj = valobj
+    
+    def hasChildren(self):
+        return True
+    
+    def num_children(self):
+        return self.numElements + 1
+
+    def get_child_at_index(self, index):
+        if index < self.numElements:
+            return self.elements.GetChildAtIndex(index)
+        return self.dc
+
+    def update(self):
+        try:
+            target = lldb.debugger.GetSelectedTarget()
+            tPrivate = target.FindFirstType("QCborContainerPrivate")
+            d = self.valobj.GetNonSyntheticValue().GetChildMemberWithName('a').GetChildMemberWithName('d')
+            self.dc = d.CreateChildAtOffset('[private]', 0, tPrivate);
+            self.elements = self.dc.GetChildMemberWithName('elements')
+            self.elements.SetPreferSyntheticValue(True)
+            self.numElements = self.elements.GetNumChildren() #  GetValueForExpressionPath('.d.size').unsigned
+        except:
+            pass
+
+@output_exceptions
+def qjsonobject_summary(valobj: lldb.SBValue, idict, options):
+    target = lldb.debugger.GetSelectedTarget()
+    tPrivate = target.FindFirstType("QCborContainerPrivate")
+    d = valobj.GetNonSyntheticValue().GetChildMemberWithName('o').GetChildMemberWithName('d')
+    dc = d.CreateChildAtOffset('[private]', 0, tPrivate);
+    elements = dc.GetChildMemberWithName('elements')
+    elements.SetPreferSyntheticValue(True)
+
+    numElements = elements.GetNumChildren()
+    return "size=%i" % numElements
+
+class JsonObjectChildProvider:
+    def __init__(self, valobj, idict):
+        self.valobj = valobj
+    
+    def hasChildren(self):
+        return True
+    
+    def num_children(self):
+        return self.numElements + 1
+
+    def get_child_at_index(self, index):
+        if index < self.numElements:
+            return self.elements.GetChildAtIndex(index)
+        return self.dc
+
+    def update(self):
+        try:
+            target = lldb.debugger.GetSelectedTarget()
+            tPrivate = target.FindFirstType("QCborContainerPrivate")
+            d = self.valobj.GetNonSyntheticValue().GetChildMemberWithName('o').GetChildMemberWithName('d')
+            self.dc = d.CreateChildAtOffset('[private]', 0, tPrivate);
+            self.elements = self.dc.GetChildMemberWithName('elements')
+            self.elements.SetPreferSyntheticValue(True)
+            self.numElements = self.elements.GetNumChildren() #  GetValueForExpressionPath('.d.size').unsigned
+        except:
+            pass
+
+@output_exceptions
 def registerTypeSummary(category, typeName, functionOrString, typeNameIsRegularExpression=False, options=None):
     '''Register a summary provider for a type.'''
     typeSpecifier = lldb.SBTypeNameSpecifier(typeName, typeNameIsRegularExpression)
@@ -493,6 +571,13 @@ def __lldb_init_module(debugger, dict):
 
     registerTypeSummary(madCategory, "^QMap<.+>$",  "${var.d.d.m}", True)
     registerTypeSynthetic(madCategory, "^QMap<.+>$", QMapChildProvider, True)
+
+    registerTypeSummary(madCategory, "QJsonArray", qjsonarray_summary)
+    registerTypeSynthetic(madCategory, "QJsonArray", JsonArrayChildProvider)
+
+    registerTypeSummary(madCategory, "QJsonObject", qjsonobject_summary)
+    registerTypeSynthetic(madCategory, "QJsonObject", JsonObjectChildProvider)
+
 
     ################################################################################
     # Qt Creator extensions
