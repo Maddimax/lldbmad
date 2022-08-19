@@ -123,14 +123,24 @@ void textCursor()
 void url()
 {
     QUrl url("http://www.google.de");
+    // CHECK_SUMMARY("url", '"http://www.google.de"');
+
     QUrl fileUrl = QUrl::fromLocalFile("/tmp/test.txt");
     QUrl portUrl("http://127.0.0.1:8888/admin");
+
     QUrl userPortUrl("http://user:pass@127.0.0.1:8888/admin");
+    // CHECK_SUMMARY("userPortUrl", '"http://user:pass@127.0.0.1:8888/admin"');
+
     QUrl empty;
+    // CHECK_SUMMARY("empty", 'None');
+
     QUrl relative("test.txt");
+    // CHECK_CHILDREN("relative", {'scheme': '""', 'host': '""', 'path': '"test.txt"', 'port': -1, 'userName': '""', 'password': '""'})
 
     QUrl *ptr = new QUrl("I am a pointer");
+
     QUrl *invalidPtr = (QUrl*)0x1234;
+    // CHECK_CHILDREN("invalidPtr", {})
 
     QUrl *nullPtr = nullptr;
     nullPtr = new QUrl("I was null but now i'm valid");
@@ -154,5 +164,5 @@ int main(int argc, char *argv[])
 
     float floatValue = 1.0f;
 
-    return a.exec();
+    return 0;
 }

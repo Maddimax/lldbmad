@@ -594,5 +594,7 @@ def __lldb_init_module(debugger, dict):
 
     registerTypeSummary(qtcCategory, "^std::__[[:alnum:]]+::pair<const Utils::DictKey, std::__[[:alnum:]]+::pair<QString, bool> >", envpair_summary, True)
 
-    registerTypeSummary(qtcCategory, "Utils::FilePath", "${var.m_scheme},${var.m_host},${var.m_data}")
+    registerTypeSummary(qtcCategory, "Utils::FilePath", "${var.m_scheme},${var.m_host},${var.m_root},${var.m_path}")
+    registerTypeSummary(qtcCategory, "Utils::FilePaths", "size=${svar%#}")
+    registerTypeSynthetic(qtcCategory, "Utils::FilePaths", QListChildProvider)
 
