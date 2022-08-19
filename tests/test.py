@@ -15,7 +15,7 @@ def check(value, expr, expected):
         for i in range(0, numChildren):
             child = value.GetChildAtIndex(i)
             k = list(expected.keys())[i]
-            if child.name != k:
+            if not isinstance(k, int) and child.name != k:
                 raise Exception('\t\tFAILED: Expected child %i to be named "%s", got "%s"' % (i, k, child.name))
 
             if child.TypeIsPointerType():

@@ -30,19 +30,23 @@ def output_exceptions(func):
 
 def detectQtVersion(debugger):
     global g_qtVersion
-
-    if g_qtVersion is None:
-        target = debugger.GetSelectedTarget()
-        v = target.EvaluateExpression('qVersion()')
-        if v.IsValid():
-            g_qtVersion = splitVersion(v.summary.strip('"'))
-            print("Detected Qt Version:", g_qtVersion)
-        else:
-            v = target.EvaluateExpression('qtHookData[2]')
-            if v.IsValid():
-                h = hex(v.unsigned)
-                g_qtVersion = (int(h[2:][:-4]), int(h[2:][-4:-2]), int(h[2:][-2:]))
+    try:
+        if g_qtVersion is None:
+            target = debugger.GetSelectedTarget()
+            v = target.EvaluateExpression('qVersion()')
+            if v.IsValid() and v.summary:
+                g_qtVersion = splitVersion(v.summary.strip('"'))
                 print("Detected Qt Version:", g_qtVersion)
+            else:
+                v = target.EvaluateExpression('qtHookData[2]')
+                if v.IsValid():
+                    h = hex(v.unsigned)
+                    g_qtVersion = (int(h[2:][:-4]), int(h[2:][-4:-2]), int(h[2:][-2:]))
+                    print("Detected Qt Version:", g_qtVersion)
+    except Exception as e:
+        print("Auto-determining Qt Version failed:", e)
+        g_qtVersion = (6, 3, 0)
+        print("Falling back to hard-coded version:", g_qtVersion)
 
     return g_qtVersion
 
@@ -98,13 +102,10 @@ class QListChildProvider:
         dt = self.ptr.GetType().GetPointeeType()
         return self.ptr.CreateChildAtOffset('[' + str(index) + ']', index * dt.GetByteSize(), dt)
 
+    @output_exceptions
     def update(self):
-        try:
-            self.dLen = self.valobj.GetChildMemberWithName('d').GetChildMemberWithName('size')
-            self.ptr = self.valobj.GetChildMemberWithName('d').GetChildMemberWithName('ptr')
-
-        except:
-            pass
+        self.dLen = self.valobj.GetChildMemberWithName('d').GetChildMemberWithName('size')
+        self.ptr = self.valobj.GetChildMemberWithName('d').GetChildMemberWithName('ptr')
 
     def has_children(self):
         return True

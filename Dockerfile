@@ -1,0 +1,11 @@
+FROM alpine:latest
+
+RUN apk update
+RUN apk add qt6-qtbase-dev
+RUN apk add qt6-qtbase-dbg
+RUN apk add cmake clang clang-dev alpine-sdk lldb ninja python3 py3-lldb
+
+RUN mkdir /build
+WORKDIR /build
+
+CMD echo 0 > /proc/sys/kernel/yama/ptrace_scope && cmake /src -GNinja -DCMAKE_BUILD_TYPE=Debug && ninja check

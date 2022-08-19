@@ -131,11 +131,14 @@ void url()
     QUrl userPortUrl("http://user:pass@127.0.0.1:8888/admin");
     // CHECK_SUMMARY("userPortUrl", '"http://user:pass@127.0.0.1:8888/admin"');
 
+    QUrl userPortFragmentUrl("http://user:pass@127.0.0.1:8888/admin?x=y&z=1#anchor");
+    // CHECK_SUMMARY("userPortFragmentUrl", '"http://user:pass@127.0.0.1:8888/admin?x=y&z=1#anchor"');
+
     QUrl empty;
     // CHECK_SUMMARY("empty", 'None');
 
     QUrl relative("test.txt");
-    // CHECK_CHILDREN("relative", {'scheme': '""', 'host': '""', 'path': '"test.txt"', 'port': -1, 'userName': '""', 'password': '""'})
+    // CHECK_CHILDREN("relative", { 'scheme': '""', 'userName': '""', 'password': '""', 'host': '""', 'port': -1, 'path': '"test.txt"', 'query': '""', 'fragment': '""' })
 
     QUrl *ptr = new QUrl("I am a pointer");
 
@@ -146,7 +149,7 @@ void url()
     nullPtr = new QUrl("I was null but now i'm valid");
 
     auto uniquePtr = std::make_unique<QUrl>("I am a unique pointer");
-    // CHECK_CHILDREN("uniquePtr", {'__value_': { 'scheme': '""', 'host': '""', 'path': '"I am a unique pointer"', 'port': -1, 'userName': '""', 'password': '""' }})
+    // CHECK_CHILDREN("uniquePtr", {0: { 'scheme': '""', 'userName': '""', 'password': '""', 'host': '""', 'port': -1, 'path': '"I am a unique pointer"', 'query': '""', 'fragment': '""' }})
 }
 
 void qList() 
@@ -161,6 +164,8 @@ void qList()
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
+
+    qDebug() << "Qt Version: " << qVersion();
 
     json();
     url();

@@ -10,13 +10,20 @@ add_test(
     NAME lldb-dumpers 
     COMMAND ${LLDB_PATH} 
         $<TARGET_FILE:lldbtest>
-        --one-line "command script import tests/test.py"
+        --no-lldbinit
+        --one-line "command script import ${CMAKE_CURRENT_SOURCE_DIR}/lldbmad.py"
+        --one-line "command script import ${CMAKE_CURRENT_SOURCE_DIR}/tests/test.py"
         -o quit
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
 
 add_custom_target(check 
     COMMAND 
-        ${CMAKE_COMMAND} -E env CTEST_OUTPUT_ON_FAILURE=1
-        ${CMAKE_CTEST_COMMAND}
-    DEPENDS lldbtest)
+        ${LLDB_PATH} 
+        $<TARGET_FILE:lldbtest>
+        --no-lldbinit
+        --one-line "command script import ${CMAKE_CURRENT_SOURCE_DIR}/../lldbmad.py"
+        --one-line "command script import ${CMAKE_CURRENT_SOURCE_DIR}/test.py"
+        -o quit
+    DEPENDS lldbtest
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..)
