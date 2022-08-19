@@ -33,6 +33,12 @@ def detectQtVersion(debugger):
         if v.IsValid():
             g_qtVersion = splitVersion(v.summary.strip('"'))
             print("Detected Qt Version:", g_qtVersion)
+        else:
+            v = target.EvaluateExpression('qtHookData[2]')
+            if v.IsValid():
+                h = hex(v.unsigned)
+                g_qtVersion = (int(h[2:][:-4]), int(h[2:][-4:-2]), int(h[2:][-2:]))
+                print("Detected Qt Version:", g_qtVersion)
 
     return g_qtVersion
 
