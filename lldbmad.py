@@ -8,7 +8,7 @@ g_qtVersion = None
 
 def stringFromSummary(summary):
     #print("Summary: ((%s))" % summary)
-    if summary == "unable to read data":
+    if not summary or summary == "unable to read data":
         return None
     
     result = summary.strip('u')
@@ -298,7 +298,7 @@ def qurl_summary(valobj: lldb.SBValue, idict, options):
         summary += ':%i' % port if port > 0 else ''
         summary += path if path else ''
     else:
-        summary = ""
+        return None
 
     return '"%s"' % summary
 
