@@ -75,6 +75,9 @@ def read_source():
                 breakpoint.SetAutoContinue(True)
             lineNumber = lineNumber+1
 
+    print("Done reading source.")
+    print()
+
 read_source()
 
 debugger.HandleCommand('r')

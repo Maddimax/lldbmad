@@ -7,8 +7,8 @@ from functools import wraps
 g_qtVersion = None
 
 def stringFromSummary(summary):
-    #print("Summary: ((%s))" % summary)
-    if not summary or summary == "unable to read data":
+    #print("Summary: ((%s, %s))" % (summary, type(summary)))
+    if not summary or summary == "unable to read data" or summary == 'None':
         return None
     
     result = summary.strip('u')
@@ -86,9 +86,13 @@ class qt_version:
 class QListChildProvider:
     def __init__(self, valobj, internal_dict):
         self.valobj = valobj
+        self.type = None
+        self.innerType = None
+        self.length = 0
+        self.begin = 0
 
     def num_children(self):
-        return self.dLen.unsigned
+        return self.length # self.dLen.unsigned
 
     def get_child_index(self, name):
         if name == '$$dereference$$':
@@ -98,14 +102,42 @@ class QListChildProvider:
         except:
             return -1
 
+    @output_exceptions
     def get_child_at_index(self, index):
-        dt = self.ptr.GetType().GetPointeeType()
-        return self.ptr.CreateChildAtOffset('[' + str(index) + ']', index * dt.GetByteSize(), dt)
+        if detectQtVersion(lldb.debugger)[0] >= 6:
+            offset = (self.begin * self.innerType.GetByteSize()) + (index * self.innerType.GetByteSize())
+            return self.ptr.CreateChildAtOffset('[' + str(index) + ']', offset, self.innerType)
+        else:
+            offset = (self.begin * self.step) + (index * self.step)
+            type = self.innerType if self.isInternal else self.innerType.GetPointerType()
+            res = self.ptr.CreateValueFromAddress('[' + str(index) + ']', self.ptr.GetLoadAddress() + offset, type)
+
+            return res
 
     @output_exceptions
+    @qt_version(6)
     def update(self):
-        self.dLen = self.valobj.GetChildMemberWithName('d').GetChildMemberWithName('size')
+        self.type = self.valobj.GetType()
+        self.innerType = self.type.GetTemplateArgumentType(0)
+        self.length = self.valobj.GetChildMemberWithName('d').GetChildMemberWithName('size').unsigned
         self.ptr = self.valobj.GetChildMemberWithName('d').GetChildMemberWithName('ptr')
+
+    @output_exceptions
+    @qt_version(5)
+    def update(self):
+        self.type = self.valobj.GetType()
+        self.innerType = self.type.GetTemplateArgumentType(0)
+        self.step = self.type.GetPointerType().GetByteSize()
+
+        self.isInternal = self.innerType.GetByteSize() <= self.type.GetPointerType().GetByteSize()
+
+        self.ptr = self.valobj.GetChildMemberWithName('d').GetChildMemberWithName('array')
+
+        self.begin = self.valobj.GetChildMemberWithName('d').GetChildMemberWithName('begin').unsigned
+        end = self.valobj.GetChildMemberWithName('d').GetChildMemberWithName('end').unsigned
+        self.length = end - self.begin
+
+
 
     def has_children(self):
         return True
@@ -274,34 +306,44 @@ def qstring_summary(valobj: lldb.SBValue, idict, options):
     addr = d.AddressOf().Dereference().unsigned
     offset = d.GetChildMemberWithName('offset').unsigned
     ptr = valobj.CreateValueFromAddress('test', addr+offset, type)
+    size = d.GetChildMemberWithName('size').unsigned
 
-    return '"%s"' % stringFromSummary(ptr.AddressOf().summary)
+    if size == 0:
+        return '""'
+
+    s = stringFromSummary(ptr.AddressOf().summary)
+
+    if s:
+        return '"%s"' % (s)
+    return None
 
 @output_exceptions
 def qurl_summary(valobj: lldb.SBValue, idict, options):
     target = lldb.debugger.GetSelectedTarget()
-    tUrlPrivate = target.FindFirstType("QUrlPrivate")
+    stringType = target.FindFirstType("QString")
+    stringSize = stringType.GetByteSize()
+    intType = target.FindFirstType("int")
 
     d = valobj.GetNonSyntheticValue().GetChildMemberWithName('d')
-    dUrlPrivate = d.CreateChildAtOffset("urlprivate", 0, tUrlPrivate)
 
-    scheme = (dUrlPrivate.GetChildMemberWithName('scheme').summary or "").strip('"')
-    host = (dUrlPrivate.GetChildMemberWithName('host').summary or "").strip('"')
-    path = (dUrlPrivate.GetChildMemberWithName('path').summary or "").strip('"')
-    port = dUrlPrivate.GetChildMemberWithName('port').signed
-    user = (dUrlPrivate.GetChildMemberWithName('userName').summary or "").strip('"')
-    password = (dUrlPrivate.GetChildMemberWithName('password').summary or "").strip('"')
-    query = (dUrlPrivate.GetChildMemberWithName('query').summary or "").strip('"')
-    fragment = (dUrlPrivate.GetChildMemberWithName('fragment').summary or "").strip('"')
+    port = d.CreateChildAtOffset('port', 4, intType).signed
 
+    scheme = stringFromSummary(d.CreateChildAtOffset('scheme',     8+(0*stringSize), stringType).summary)
+    user = stringFromSummary(d.CreateChildAtOffset('userName',     8+(1*stringSize), stringType).summary)
+    password = stringFromSummary(d.CreateChildAtOffset('password', 8+(2*stringSize), stringType).summary)
+    host = stringFromSummary(d.CreateChildAtOffset('host',         8+(3*stringSize), stringType).summary)
+    path = stringFromSummary(d.CreateChildAtOffset('path',         8+(4*stringSize), stringType).summary)
+    query = stringFromSummary(d.CreateChildAtOffset('query',       8+(5*stringSize), stringType).summary)
+    fragment = stringFromSummary(d.CreateChildAtOffset('fragment', 8+(6*stringSize), stringType).summary)
+   
     if any([scheme, host, path, port, user, password]):
         summary = scheme + '://' if scheme else ''
-        summary += user + ':' + password + '@' if user else ''
+        summary += (user or "") + ':' + (password or "") + '@' if user else ''
         summary += host if host else ''
         summary += ':%i' % port if port > 0 else ''
         summary += path if path else ''
-        summary += "?%s" % query if query else ''
-        summary += "#%s" % fragment if fragment else ''
+        summary += '?%s' % query if query else ''
+        summary += '#%s' % fragment if fragment else ''
     else:
         return None
 
@@ -328,22 +370,22 @@ class QUrlProvider:
     @output_exceptions
     def update(self):
         target = lldb.debugger.GetSelectedTarget()
-        self.urlPrivateType = target.FindFirstType("QUrlPrivate")
+        stringType = target.FindFirstType("QString")
+        stringSize = stringType.GetByteSize()
+        intType = target.FindFirstType("int")
 
         self.d = self.valobj.GetNonSyntheticValue().GetChildMemberWithName('d')
-        self.dUrlPrivate = self.d.CreateChildAtOffset("urlprivate", 0, self.urlPrivateType)
-
+        
         self.children = list(filter(lambda child: child.GetError().Success(), [
-            self.dUrlPrivate.GetChildMemberWithName('scheme'),
-            self.dUrlPrivate.GetChildMemberWithName('userName'),
-            self.dUrlPrivate.GetChildMemberWithName('password'),
-            self.dUrlPrivate.GetChildMemberWithName('host'),
-            self.dUrlPrivate.GetChildMemberWithName('port'),
-            self.dUrlPrivate.GetChildMemberWithName('path'),
-            self.dUrlPrivate.GetChildMemberWithName('query'),
-            self.dUrlPrivate.GetChildMemberWithName('fragment'),
+            self.d.CreateChildAtOffset('scheme',   8+(0*stringSize), stringType),
+            self.d.CreateChildAtOffset('userName', 8+(1*stringSize), stringType),
+            self.d.CreateChildAtOffset('password', 8+(2*stringSize), stringType),
+            self.d.CreateChildAtOffset('host',     8+(3*stringSize), stringType),
+            self.d.CreateChildAtOffset('port',     4, intType),
+            self.d.CreateChildAtOffset('path',     8+(4*stringSize), stringType),
+            self.d.CreateChildAtOffset('query',    8+(5*stringSize), stringType),
+            self.d.CreateChildAtOffset('fragment', 8+(6*stringSize), stringType),
         ]))
-
 
 class QStringProvider:
     def __init__(self, valobj, idict):

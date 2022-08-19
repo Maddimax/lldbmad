@@ -154,11 +154,25 @@ void url()
 
 void qList() 
 {
+    using ComplexType = std::pair<int, QString>;
+
     QList<int> empty;
     // CHECK_SUMMARY("empty", 'size=0');
 
     QList<int> someInts{1,2,3,4};
     // CHECK("someInts", 'size=4', {'[0]': 1, '[1]': 2, '[2]': 3, '[3]': 4})
+
+    QList<QString> stringList{"one", "two", "three"};
+    // CHECK("stringList", 'size=3', {'[0]': '"one"', '[1]': '"two"', '[2]': '"three"'})
+
+    ComplexType ct{1, "Hallo"};
+    // CHECK_CHILDREN("ct", {'first': 1, 'second': '"Hallo"'})
+
+    QList<ComplexType> someComplexTypes{ComplexType(1, "one"), ComplexType(2, "two"), ComplexType(3, "three")};
+    // CHECK("someComplexTypes", 'size=3', {'[0]': {"first": 1, "second": '"one"'}, '[1]': {"first": 1, "second": '"one"'}, '[2]': {"first": 1, "second": '"one"'}})
+
+    someComplexTypes.erase(someComplexTypes.begin());
+
 }
 
 int main(int argc, char *argv[])
