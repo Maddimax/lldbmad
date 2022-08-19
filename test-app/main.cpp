@@ -146,6 +146,16 @@ void url()
     nullPtr = new QUrl("I was null but now i'm valid");
 
     auto uniquePtr = std::make_unique<QUrl>("I am a unique pointer");
+    // CHECK_CHILDREN("uniquePtr", {'__value_': { 'scheme': '""', 'host': '""', 'path': '"I am a unique pointer"', 'port': -1, 'userName': '""', 'password': '""' }})
+}
+
+void qList() 
+{
+    QList<int> empty;
+    // CHECK_SUMMARY("empty", 'size=0');
+
+    QList<int> someInts{1,2,3,4};
+    // CHECK("someInts", 'size=4', {'[0]': 1, '[1]': 5, '[2]': 3, '[3]': 4})
 }
 
 int main(int argc, char *argv[])
@@ -161,6 +171,7 @@ int main(int argc, char *argv[])
     qMap();
     qObject();
     qString();
+    qList();
 
     float floatValue = 1.0f;
 
