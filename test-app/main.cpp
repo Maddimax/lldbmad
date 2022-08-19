@@ -16,15 +16,15 @@
 #include <QTextDocument>
 
 #include <QStringView>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonValue>
 
 #include <vector>
 
-int main(int argc, char *argv[])
+void qString()
 {
-    QCoreApplication a(argc, argv);
-
-    float floatValue = 1.0f;
-
     QStringList test({"Hallo", "Welt"});
 
     std::vector<QString> testVector{"Hallo", "Welt"};
@@ -33,28 +33,40 @@ int main(int argc, char *argv[])
     *testPtr << "UNique";
     *testPtr << "Ptr";
 
-    QObject* qObj = new QObject();
+    QString floatString = "Just a float?";
+
+    QStringView sv(floatString);
+    QStringView svMid = sv.mid(4);
+
+    QStringView svLeft = sv.left(4);
+}
+
+void qObject()
+{
+    QObject *qObj = new QObject();
     qObj->setObjectName("Object_Name_Here");
 
-    QObject* qObjNoName = new QObject(qObj);
+    QObject *qObjNoName = new QObject(qObj);
     qObjNoName->setProperty("Test", "Hallo");
     qObjNoName->setProperty("2te Property", 1234);
-    //QObject::staticMetaObject()
+}
 
+void qMap()
+{
     QMap<QString, QMap<QString, int>> testMap;
-    QMap<QString,int> testiMap;
+    QMap<QString, int> testiMap;
     testiMap["1"] = 1;
     testMap["key"] = testiMap;
     QVariant mapVar = QVariant::fromValue(testMap);
-
     QMap<QString, float> floatMap;
     floatMap["key1"] = 1.01234f;
     floatMap["key2"] = 2.01234f;
     floatMap["key3"] = 3.01234f;
     floatMap["key4"] = 4.01234f;
+}
 
-    QString floatString = "Just a float?";
-
+void qVariant()
+{
     QVariant emptyVar;
     QVariant intVar(1234);
     QVariant floatVar(0.1234);
@@ -67,46 +79,80 @@ int main(int argc, char *argv[])
     QVariant rectVar(r);
 
     QVariant sharedVar(stringVar);
+}
 
+void qHash()
+{
     QHash<int, QPair<int, int>> testHash;
     testHash[10] = QPair<int, int>(10, 12);
 
-    for(auto it = testHash.begin(); it != testHash.end(); ++it) {
+    for (auto it = testHash.begin(); it != testHash.end(); ++it)
+    {
         qDebug() << it.key();
     }
+}
 
-    char* x = new char[128];
+void json()
+{
+    QJsonArray arr({123, 234, 533});
 
-    strcpy(x, "Hallo Welt");
+    QJsonObject obj({{"key1", "value1"}, {"key2", "value2"}});
 
+    qDebug() << arr;
+    qDebug() << obj;
+}
+
+void file()
+{
     QFile f("/tmp/test.txt");
-    f.open(QIODevice::WriteOnly|QIODevice::ExistingOnly|QIODevice::Append);
+    f.open(QIODevice::WriteOnly | QIODevice::ExistingOnly | QIODevice::Append);
 
     QFileInfo fInfo("/tmp/test.txt");
+}
 
-    QUrl url("http://www.google.de");
-    QUrl fileUrl = QUrl::fromLocalFile("/tmp/test.txt");
-    QUrl portUrl("http://127.0.0.1:8888/admin");
-    QUrl userPortUrl("http://user:pass@127.0.0.1:8888/admin");
-
-    qDebug() << test;
-
-    
-    QStringView sv(floatString);
-    QStringView svMid = sv.mid(4); 
-
-    QStringView svLeft = sv.left(4);
-
-    //QObjectPrivate
-
+void textCursor()
+{
     QTextDocument doc;
     doc.setHtml("<p>Hallo Welt</p>");
 
     QTextCursor cursor(&doc);
     cursor.setPosition(2);
     cursor.movePosition(QTextCursor::MoveOperation::Right, QTextCursor::KeepAnchor, 10);
+}
 
-    qVersion();
+void url()
+{
+    QUrl url("http://www.google.de");
+    QUrl fileUrl = QUrl::fromLocalFile("/tmp/test.txt");
+    QUrl portUrl("http://127.0.0.1:8888/admin");
+    QUrl userPortUrl("http://user:pass@127.0.0.1:8888/admin");
+    QUrl empty;
+    QUrl relative("test.txt");
+
+    QUrl *ptr = new QUrl("I am a pointer");
+    QUrl *invalidPtr = (QUrl*)0x1234;
+
+    QUrl *nullPtr = nullptr;
+    nullPtr = new QUrl("I was null but now i'm valid");
+
+    auto uniquePtr = std::make_unique<QUrl>("I am a unique pointer");
+}
+
+int main(int argc, char *argv[])
+{
+    QCoreApplication a(argc, argv);
+
+    json();
+    url();
+    textCursor();
+    file();
+    qVariant();
+    qHash();
+    qMap();
+    qObject();
+    qString();
+
+    float floatValue = 1.0f;
 
     return a.exec();
 }
