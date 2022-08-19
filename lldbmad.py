@@ -277,20 +277,59 @@ def qurl_summary(valobj: lldb.SBValue, idict, options):
     d = valobj.GetNonSyntheticValue().GetChildMemberWithName('d')
     dUrlPrivate = d.CreateChildAtOffset("urlprivate", 0, tUrlPrivate)
 
-    scheme = dUrlPrivate.GetChildMemberWithName('scheme').summary.strip('"')
-    host = dUrlPrivate.GetChildMemberWithName('host').summary.strip('"')
-    path = dUrlPrivate.GetChildMemberWithName('path').summary.strip('"')
+    scheme = (dUrlPrivate.GetChildMemberWithName('scheme').summary or "").strip('"')
+    host = (dUrlPrivate.GetChildMemberWithName('host').summary or "").strip('"')
+    path = (dUrlPrivate.GetChildMemberWithName('path').summary or "").strip('"')
     port = dUrlPrivate.GetChildMemberWithName('port').signed
-    user = dUrlPrivate.GetChildMemberWithName('userName').summary.strip('"')
-    password = dUrlPrivate.GetChildMemberWithName('password').summary.strip('"')
+    user = (dUrlPrivate.GetChildMemberWithName('userName').summary or "").strip('"')
+    password = (dUrlPrivate.GetChildMemberWithName('password').summary or "").strip('"')
 
-    summary = scheme + '://'
-    summary += user + ':' + password + '@' if user else ''
-    summary += host if host else ''
-    summary += ':%i' % port if port > 0 else ''
-    summary += path if path else ''
+    if any([scheme, host, path, port, user, password]):
+        summary = scheme + '://' if scheme else ''
+        summary += user + ':' + password + '@' if user else ''
+        summary += host if host else ''
+        summary += ':%i' % port if port > 0 else ''
+        summary += path if path else ''
+    else:
+        summary = ""
 
     return '"%s"' % summary
+
+class QUrlProvider:
+    def __init__(self, valobj, _):
+        self.valobj = valobj
+        self.urlPrivateType = None
+        self.dUrlPrivate = None
+        self.d = None
+        self.children = []
+    
+    def hasChildren(self):
+        return True
+    
+    def num_children(self):
+        return len(self.children)
+
+    @output_exceptions
+    def get_child_at_index(self, index):
+        return self.children[index]
+    
+    @output_exceptions
+    def update(self):
+        target = lldb.debugger.GetSelectedTarget()
+        self.urlPrivateType = target.FindFirstType("QUrlPrivate")
+
+        self.d = self.valobj.GetNonSyntheticValue().GetChildMemberWithName('d')
+        self.dUrlPrivate = self.d.CreateChildAtOffset("urlprivate", 0, self.urlPrivateType)
+
+        self.children = list(filter(lambda child: child.GetError().Success(), [
+            self.dUrlPrivate.GetChildMemberWithName('scheme'),
+            self.dUrlPrivate.GetChildMemberWithName('host'),
+            self.dUrlPrivate.GetChildMemberWithName('path'),
+            self.dUrlPrivate.GetChildMemberWithName('port'),
+            self.dUrlPrivate.GetChildMemberWithName('userName'),
+            self.dUrlPrivate.GetChildMemberWithName('password'),
+        ]))
+
 
 class QStringProvider:
     def __init__(self, valobj, idict):
@@ -436,6 +475,7 @@ def __lldb_init_module(debugger, dict):
     registerTypeSummary(madCategory, "QFileInfo", "${var.d_ptr.d.fileEntry.m_filePath}")
 
     registerTypeSummary(madCategory, "QUrl", qurl_summary)
+    registerTypeSynthetic(madCategory, "QUrl", QUrlProvider)
 
     registerTypeSummary(madCategory, "QStringView", qstringview_summary)
 
