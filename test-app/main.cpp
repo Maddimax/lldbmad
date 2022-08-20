@@ -1,4 +1,5 @@
 #include <QCoreApplication>
+#include <QGuiApplication>
 
 #include <QList>
 #include <QDebug>
@@ -26,25 +27,33 @@
 void qString()
 {
     QStringList test({"Hallo", "Welt"});
+    // CHECK("test", "size=2", {'[0]': '"Hallo"', '[1]': '"Welt"'} )
 
     std::vector<QString> testVector{"Hallo", "Welt"};
+    // CHECK("testVector", "size=2", {'[0]': '"Hallo"', '[1]': '"Welt"'} )
 
     std::unique_ptr<QStringList> testPtr = std::make_unique<QStringList>();
     *testPtr << "UNique";
     *testPtr << "Ptr";
 
     QString floatString = "Just a float?";
+    // CHECK_SUMMARY("floatString", '"Just a float?"')
 
     QStringView sv(floatString);
+    // CHECK_SUMMARY("sv", '"Just a float?"')
+
     QStringView svMid = sv.mid(4);
+    // CHECK_SUMMARY("svMid", '" a float?"')
 
     QStringView svLeft = sv.left(4);
+    // CHECK_SUMMARY("svLeft", '"Just"')
 }
 
 void qObject()
 {
     QObject *qObj = new QObject();
     qObj->setObjectName("Object_Name_Here");
+    // CHECK_SUMMARY("qObj", '{"Object_Name_Here"}')
 
     QObject *qObjNoName = new QObject(qObj);
     qObjNoName->setProperty("Test", "Hallo");
@@ -105,7 +114,8 @@ void json()
 void file()
 {
     QFile f("/tmp/test.txt");
-    f.open(QIODevice::WriteOnly | QIODevice::ExistingOnly | QIODevice::Append);
+    f.open(QIODevice::WriteOnly | QIODevice::Append);
+    // CHECK_SUMMARY("f", "filename=/tmp/test.txt, openmode=write|append, error=NoError")
 
     QFileInfo fInfo("/tmp/test.txt");
 }
@@ -118,6 +128,7 @@ void textCursor()
     QTextCursor cursor(&doc);
     cursor.setPosition(2);
     cursor.movePosition(QTextCursor::MoveOperation::Right, QTextCursor::KeepAnchor, 10);
+    // CHECK_SUMMARY("cursor", "pos=10, anchor=2")
 }
 
 void url()
@@ -169,15 +180,15 @@ void qList()
     // CHECK_CHILDREN("ct", {'first': 1, 'second': '"Hallo"'})
 
     QList<ComplexType> someComplexTypes{ComplexType(1, "one"), ComplexType(2, "two"), ComplexType(3, "three")};
-    // CHECK("someComplexTypes", 'size=3', {'[0]': {"first": 1, "second": '"one"'}, '[1]': {"first": 1, "second": '"one"'}, '[2]': {"first": 1, "second": '"one"'}})
+    // CHECK("someComplexTypes", 'size=3', {'[0]': {"first": 1, "second": '"one"'}, '[1]': {"first": 2, "second": '"two"'}, '[2]': {"first": 3, "second": '"three"'}})
 
     someComplexTypes.erase(someComplexTypes.begin());
-
+    // CHECK("someComplexTypes", 'size=2', {'[1]': {"first": 2, "second": '"two"'}, '[2]': {"first": 3, "second": '"three"'}})
 }
 
 int main(int argc, char *argv[])
 {
-    QCoreApplication a(argc, argv);
+    QGuiApplication a(argc, argv);
 
     qDebug() << "Qt Version: " << qVersion();
 

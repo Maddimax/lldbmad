@@ -65,22 +65,22 @@ class qt_version:
     # This is the decorator function. It is called once for every instance of @qt_version being used.
     def __call__(self, func):
         # If we haven't seen this function yet, add it to the dictionary.
-        if not func.__name__ in self._func_versions:
-            self._func_versions[func.__name__] = {}
+        if not func.__qualname__ in self._func_versions:
+            self._func_versions[func.__qualname__] = {}
 
         # Add the function to the dictionary.
-        self._func_versions[func.__name__][self._version] = func
+        self._func_versions[func.__qualname__][self._version] = func
 
         # This is the wrapper function that is actually called.
         @wraps(func)
         def wrapped(*args, **kwargs):
             v = detectQtVersion(lldb.debugger)
-            # func.__name__ is captured once when __call__ is called.
+            # func.__qualname__ is captured once when __call__ is called.
 
-            if not v[0] in self._func_versions[func.__name__]:
-                raise Exception('"%s" is not implemented for Qt version %s' % (func.__name__, v[0]))
+            if not v[0] in self._func_versions[func.__qualname__]:
+                raise Exception('"%s" is not implemented for Qt version %s' % (func.__qualname__, v[0]))
 
-            return self._func_versions[func.__name__][v[0]](*args, **kwargs)
+            return self._func_versions[func.__qualname__][v[0]](*args, **kwargs)
         return wrapped
 
 class QListChildProvider:
@@ -103,16 +103,18 @@ class QListChildProvider:
             return -1
 
     @output_exceptions
+    @qt_version(6)
     def get_child_at_index(self, index):
-        if detectQtVersion(lldb.debugger)[0] >= 6:
-            offset = (self.begin * self.innerType.GetByteSize()) + (index * self.innerType.GetByteSize())
-            return self.ptr.CreateChildAtOffset('[' + str(index) + ']', offset, self.innerType)
-        else:
-            offset = (self.begin * self.step) + (index * self.step)
-            type = self.innerType if self.isInternal else self.innerType.GetPointerType()
-            res = self.ptr.CreateValueFromAddress('[' + str(index) + ']', self.ptr.GetLoadAddress() + offset, type)
+        offset = (self.begin * self.innerType.GetByteSize()) + (index * self.innerType.GetByteSize())
+        return self.ptr.CreateChildAtOffset('[' + str(index) + ']', offset, self.innerType)
 
-            return res
+    @output_exceptions
+    @qt_version(5)
+    def get_child_at_index(self, index):
+        offset = (self.begin * self.step) + (index * self.step)
+        type = self.innerType if self.isInternal else self.innerType.GetPointerType()
+        res = self.ptr.CreateValueFromAddress('[' + str(index) + ']', self.ptr.GetLoadAddress() + offset, type)
+        return res
 
     @output_exceptions
     @qt_version(6)
@@ -133,11 +135,11 @@ class QListChildProvider:
 
         self.ptr = self.valobj.GetChildMemberWithName('d').GetChildMemberWithName('array')
 
-        self.begin = self.valobj.GetChildMemberWithName('d').GetChildMemberWithName('begin').unsigned
+        begin = self.valobj.GetChildMemberWithName('d').GetChildMemberWithName('begin').unsigned
         end = self.valobj.GetChildMemberWithName('d').GetChildMemberWithName('end').unsigned
+
+        self.begin = begin 
         self.length = end - self.begin
-
-
 
     def has_children(self):
         return True
@@ -215,6 +217,18 @@ def qcoreapplication_summary(valobj, idict, options):
     return "{%s}"%' '.join(args)
 
 @output_exceptions
+@qt_version(6)
+def qobject_summary(valobj, idict, options):
+    extraData = valobj.GetNonSyntheticValue().GetValueForExpressionPath('.d_ptr.d' ).Dereference().GetChildMemberWithName('extraData')# '((QObjectPrivate*).d_ptr.d).extraData.objectName.val')
+    if extraData.unsigned != 0:
+        objName = extraData.Dereference().GetChildMemberWithName('objectName').GetChildMemberWithName('val')
+        if objName.summary != None:
+            return "{%s}" % objName.summary
+
+    return ""
+
+@output_exceptions
+@qt_version(5)
 def qobject_summary(valobj, idict, options):
     extraData = valobj.GetNonSyntheticValue().GetValueForExpressionPath('.d_ptr.d' ).Dereference().GetChildMemberWithName('extraData')# '((QObjectPrivate*).d_ptr.d).extraData.objectName.val')
     if extraData.unsigned != 0:
@@ -223,6 +237,7 @@ def qobject_summary(valobj, idict, options):
             return "{%s}" % objName.summary
 
     return ""
+
 
 class QObjectChildProvider:
     def __init__(self, valobj, idict):
@@ -579,10 +594,11 @@ def registerTypeSummary(category, typeName, functionOrString, typeNameIsRegularE
     return summary
 
 @output_exceptions
-def registerTypeSynthetic(category, typeName, cls, typeNameIsRegularExpression=False):
+def registerTypeSynthetic(category, typeName, cls, typeNameIsRegularExpression=False, options=None):
     '''Register a synthetic provider for a type.'''
     typeSpecifier = lldb.SBTypeNameSpecifier(typeName, typeNameIsRegularExpression)
     typeSynthetic = lldb.SBTypeSynthetic().CreateWithClassName("%s.%s" %(__name__, cls.__name__))
+    typeSynthetic.SetOptions(options)
     category.AddTypeSynthetic(typeSpecifier, typeSynthetic)
     #print("%s => %s" % (typeSpecifier, typeSynthetic))
     return typeSynthetic
@@ -617,16 +633,16 @@ def __lldb_init_module(debugger, dict):
 
     registerTypeSummary(madCategory, "QTextCursor", qtextcursor_summary)
 
-    registerTypeSummary(madCategory, "^QList<.+>$", "size=${svar%#}", True)
-    registerTypeSynthetic(madCategory, "^QList<.+>$", QListChildProvider, True)
+    registerTypeSummary(madCategory, "^QList<.+>$", "size=${svar%#}", True, lldb.eTypeOptionCascade)
+    registerTypeSynthetic(madCategory, "^QList<.+>$", QListChildProvider, True, lldb.eTypeOptionCascade)
 
     registerTypeSummary(madCategory, "QVariant", "<placeholder>", False, lldb.eTypeOptionShowOneLiner)
     registerTypeSynthetic(madCategory, "QVariant", QVariantChildProvider)
 
     registerTypeSummary(madCategory, "^Q.*Application$", qcoreapplication_summary, True)
 
-    registerTypeSummary(madCategory, "^QMap<.+>$",  "${var.d.d.m}", True)
-    registerTypeSynthetic(madCategory, "^QMap<.+>$", QMapChildProvider, True)
+    registerTypeSummary(madCategory, "^QMap<.+>$",  "${var.d.d.m}", True, lldb.eTypeOptionCascade)
+    registerTypeSynthetic(madCategory, "^QMap<.+>$", QMapChildProvider, True, lldb.eTypeOptionCascade)
 
     registerTypeSummary(madCategory, "QJsonArray", qjsonarray_summary)
     registerTypeSynthetic(madCategory, "QJsonArray", JsonArrayChildProvider)
