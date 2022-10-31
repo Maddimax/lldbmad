@@ -83,7 +83,7 @@ class qt_version:
             return self._func_versions[func.__qualname__][v[0]](*args, **kwargs)
         return wrapped
 
-class QListChildProvider:
+class QListChildProvider(lldb.SBSyntheticValueProvider):
     def __init__(self, valobj, internal_dict):
         self.valobj = valobj
         self.type = None
@@ -105,7 +105,7 @@ class QListChildProvider:
     @output_exceptions
     @qt_version(6)
     def get_child_at_index(self, index):
-        offset = (self.begin * self.innerType.GetByteSize()) + (index * self.innerType.GetByteSize())
+        offset = (index * self.innerType.GetByteSize())
         return self.ptr.CreateChildAtOffset('[' + str(index) + ']', offset, self.innerType)
 
     @output_exceptions
@@ -120,7 +120,7 @@ class QListChildProvider:
     @qt_version(6)
     def update(self):
         self.type = self.valobj.GetType()
-        self.innerType = self.type.GetTemplateArgumentType(0)
+        self.innerType = self.ptr.GetType().GetPointeeType()
         self.length = self.valobj.GetChildMemberWithName('d').GetChildMemberWithName('size').unsigned
         self.ptr = self.valobj.GetChildMemberWithName('d').GetChildMemberWithName('ptr')
 
