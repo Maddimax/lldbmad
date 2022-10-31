@@ -551,6 +551,24 @@ def qjsonobject_summary(valobj: lldb.SBValue, idict, options):
     numElements = elements.GetNumChildren()
     return "size=%i" % numElements
 
+@output_exceptions
+def qtc_filepath_summary(valobj: lldb.SBValue, idict, options):
+    mData = valobj.GetChildMemberWithName('m_data')
+    mPathLen = valobj.GetChildMemberWithName('m_pathLen').unsigned
+    mSchemeLen = valobj.GetChildMemberWithName('m_schemeLen').unsigned
+    mHostLen = valobj.GetChildMemberWithName('m_hostLen').unsigned
+
+    data = stringFromSummary(mData.GetSummary())
+    if not data:
+        return '<empty>'
+    path = data[:mPathLen]
+    scheme = data[mPathLen:mPathLen+mSchemeLen]
+    host = data[mPathLen + mSchemeLen:mPathLen + mSchemeLen+mHostLen]
+    
+    if mSchemeLen > 0 and mHostLen > 0:
+        return f'"{scheme}://{host}{path}"'
+    return f'"{path}"'
+
 class JsonObjectChildProvider:
     def __init__(self, valobj, idict):
         self.valobj = valobj
@@ -660,7 +678,7 @@ def __lldb_init_module(debugger, dict):
 
     registerTypeSummary(qtcCategory, "^std::__[[:alnum:]]+::pair<const Utils::DictKey, std::__[[:alnum:]]+::pair<QString, bool> >", envpair_summary, True)
 
-    registerTypeSummary(qtcCategory, "Utils::FilePath", "${var.m_scheme},${var.m_host},${var.m_root},${var.m_path}")
+    registerTypeSummary(qtcCategory, "Utils::FilePath", qtc_filepath_summary)
     registerTypeSummary(qtcCategory, "Utils::FilePaths", "size=${svar%#}")
     registerTypeSynthetic(qtcCategory, "Utils::FilePaths", QListChildProvider)
 
