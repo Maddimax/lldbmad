@@ -1,5 +1,4 @@
 #include <QCoreApplication>
-#include <QGuiApplication>
 
 #include <QList>
 #include <QDebug>
@@ -24,36 +23,42 @@
 
 #include <vector>
 
+void chk() {}
+
 void qString()
 {
     QStringList test({"Hallo", "Welt"});
-    // CHECK("test", "size=2", {'[0]': '"Hallo"', '[1]': '"Welt"'} )
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    chk(); // CHECK("test", None, {'[0]': '"Hallo"', '[1]': '"Welt"'})
+#else
+    chk(); // CHECK("test", None, { 0: {'[0]': '"Hallo"', '[1]': '"Welt"'}})
+#endif
 
     std::vector<QString> testVector{"Hallo", "Welt"};
-    // CHECK("testVector", "size=2", {'[0]': '"Hallo"', '[1]': '"Welt"'} )
+    chk(); // CHECK("testVector", "size=2", {'[0]': '"Hallo"', '[1]': '"Welt"'} )
 
     std::unique_ptr<QStringList> testPtr = std::make_unique<QStringList>();
     *testPtr << "UNique";
     *testPtr << "Ptr";
 
     QString floatString = "Just a float?";
-    // CHECK_SUMMARY("floatString", '"Just a float?"')
+    chk(); // CHECK_SUMMARY("floatString", '"Just a float?"')
 
     QStringView sv(floatString);
-    // CHECK_SUMMARY("sv", '"Just a float?"')
+    chk(); // CHECK_SUMMARY("sv", '"Just a float?"')
 
     QStringView svMid = sv.mid(4);
-    // CHECK_SUMMARY("svMid", '" a float?"')
+    chk(); // CHECK_SUMMARY("svMid", '" a float?"')
 
     QStringView svLeft = sv.left(4);
-    // CHECK_SUMMARY("svLeft", '"Just"')
+    chk(); // CHECK_SUMMARY("svLeft", '"Just"')
 }
 
 void qObject()
 {
     QObject *qObj = new QObject();
     qObj->setObjectName("Object_Name_Here");
-    // CHECK_SUMMARY("qObj", '{"Object_Name_Here"}')
+    chk(); // CHECK_SUMMARY("qObj", '{"Object_Name_Here"}')
 
     QObject *qObjNoName = new QObject(qObj);
     qObjNoName->setProperty("Test", "Hallo");
@@ -115,7 +120,7 @@ void file()
 {
     QFile f("/tmp/test.txt");
     f.open(QIODevice::WriteOnly | QIODevice::Append);
-    // CHECK_SUMMARY("f", "filename=/tmp/test.txt, openmode=write|append, error=NoError")
+    chk(); // CHECK_SUMMARY("f", "{filename=/tmp/test.txt, openmode=write|append, error=NoError}")
 
     QFileInfo fInfo("/tmp/test.txt");
 }
@@ -128,39 +133,40 @@ void textCursor()
     QTextCursor cursor(&doc);
     cursor.setPosition(2);
     cursor.movePosition(QTextCursor::MoveOperation::Right, QTextCursor::KeepAnchor, 10);
-    // CHECK_SUMMARY("cursor", "pos=10, anchor=2")
+    chk(); // CHECK_SUMMARY("cursor", "{pos=10, anchor=2}")
 }
 
 void url()
 {
     QUrl url("http://www.google.de");
-    // CHECK_SUMMARY("url", '"http://www.google.de"');
+    chk(); // CHECK_SUMMARY("url", '"http://www.google.de"')
 
     QUrl fileUrl = QUrl::fromLocalFile("/tmp/test.txt");
     QUrl portUrl("http://127.0.0.1:8888/admin");
 
     QUrl userPortUrl("http://user:pass@127.0.0.1:8888/admin");
-    // CHECK_SUMMARY("userPortUrl", '"http://user:pass@127.0.0.1:8888/admin"');
+    chk(); // CHECK_SUMMARY("userPortUrl", '"http://user:pass@127.0.0.1:8888/admin"')
 
     QUrl userPortFragmentUrl("http://user:pass@127.0.0.1:8888/admin?x=y&z=1#anchor");
-    // CHECK_SUMMARY("userPortFragmentUrl", '"http://user:pass@127.0.0.1:8888/admin?x=y&z=1#anchor"');
+    chk(); // CHECK_SUMMARY("userPortFragmentUrl", '"http://user:pass@127.0.0.1:8888/admin?x=y&z=1#anchor"')
 
     QUrl empty;
-    // CHECK_SUMMARY("empty", 'None');
+    chk(); // CHECK_SUMMARY("empty", 'None')
 
     QUrl relative("test.txt");
-    // CHECK_CHILDREN("relative", { 'scheme': '""', 'userName': '""', 'password': '""', 'host': '""', 'port': -1, 'path': '"test.txt"', 'query': '""', 'fragment': '""' })
+    chk(); // CHECK_CHILDREN("relative", { 'scheme': '""', 'userName': '""', 'password': '""', 'host': '""', 'port': -1, 'path': '"test.txt"', 'query': '""', 'fragment': '""' })
 
     QUrl *ptr = new QUrl("I am a pointer");
+    chk(); // CHECK_SUMMARY("ptr", '"I am a pointer"')
 
     QUrl *invalidPtr = (QUrl*)0x1234;
-    // CHECK_CHILDREN("invalidPtr", {})
+    chk(); // CHECK_CHILDREN("invalidPtr", {})
 
     QUrl *nullPtr = nullptr;
     nullPtr = new QUrl("I was null but now i'm valid");
 
     auto uniquePtr = std::make_unique<QUrl>("I am a unique pointer");
-    // CHECK_CHILDREN("uniquePtr", {0: { 'scheme': '""', 'userName': '""', 'password': '""', 'host': '""', 'port': -1, 'path': '"I am a unique pointer"', 'query': '""', 'fragment': '""' }})
+    chk(); // CHECK_CHILDREN("uniquePtr", {0: { 'scheme': '""', 'userName': '""', 'password': '""', 'host': '""', 'port': -1, 'path': '"I am a unique pointer"', 'query': '""', 'fragment': '""' }})
 }
 
 void qList() 
@@ -168,27 +174,28 @@ void qList()
     using ComplexType = std::pair<int, QString>;
 
     QList<int> empty;
-    // CHECK_SUMMARY("empty", 'size=0');
+    chk(); // CHECK_SUMMARY("empty", 'size=0')
 
     QList<int> someInts{1,2,3,4};
-    // CHECK("someInts", 'size=4', {'[0]': 1, '[1]': 2, '[2]': 3, '[3]': 4})
+    qDebug() << "XXXXXX:" << someInts;
+    chk(); // CHECK("someInts", 'size=4', {'[0]': 1, '[1]': 2, '[2]': 3, '[3]': 4})
 
     QList<QString> stringList{"one", "two", "three"};
-    // CHECK("stringList", 'size=3', {'[0]': '"one"', '[1]': '"two"', '[2]': '"three"'})
+    chk(); // CHECK("stringList", 'size=3', {'[0]': '"one"', '[1]': '"two"', '[2]': '"three"'})
 
     ComplexType ct{1, "Hallo"};
-    // CHECK_CHILDREN("ct", {'first': 1, 'second': '"Hallo"'})
+    chk(); // CHECK_CHILDREN("ct", {'first': 1, 'second': '"Hallo"'})
 
     QList<ComplexType> someComplexTypes{ComplexType(1, "one"), ComplexType(2, "two"), ComplexType(3, "three")};
-    // CHECK("someComplexTypes", 'size=3', {'[0]': {"first": 1, "second": '"one"'}, '[1]': {"first": 2, "second": '"two"'}, '[2]': {"first": 3, "second": '"three"'}})
+    chk(); // CHECK("someComplexTypes", 'size=3', {'[0]': {"first": 1, "second": '"one"'}, '[1]': {"first": 2, "second": '"two"'}, '[2]': {"first": 3, "second": '"three"'}})
 
     someComplexTypes.erase(someComplexTypes.begin());
-    // CHECK("someComplexTypes", 'size=2', {'[1]': {"first": 2, "second": '"two"'}, '[2]': {"first": 3, "second": '"three"'}})
+    chk(); // CHECK("someComplexTypes", 'size=2', {'[0]': {"first": 2, "second": '"two"'}, '[1]': {"first": 3, "second": '"three"'}})
 }
 
 int main(int argc, char *argv[])
 {
-    QGuiApplication a(argc, argv);
+    QCoreApplication a(argc, argv);
 
     qDebug() << "Qt Version: " << qVersion();
 
