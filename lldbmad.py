@@ -120,9 +120,9 @@ class QListChildProvider(lldb.SBSyntheticValueProvider):
     @qt_version(6)
     def update(self):
         self.type = self.valobj.GetType()
+        self.ptr = self.valobj.GetChildMemberWithName('d').GetChildMemberWithName('ptr')
         self.innerType = self.ptr.GetType().GetPointeeType()
         self.length = self.valobj.GetChildMemberWithName('d').GetChildMemberWithName('size').unsigned
-        self.ptr = self.valobj.GetChildMemberWithName('d').GetChildMemberWithName('ptr')
 
     @output_exceptions
     @qt_version(5)
