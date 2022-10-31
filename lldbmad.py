@@ -586,7 +586,7 @@ def registerTypeSummary(category, typeName, functionOrString, typeNameIsRegularE
         summary = lldb.SBTypeSummary().CreateWithSummaryString(functionOrString)
     else:
         summary = lldb.SBTypeSummary().CreateWithFunctionName("%s.%s" %(__name__, functionOrString.__name__))
-    if options:
+    if options != None:
         summary.SetOptions(options)
     
     category.AddTypeSummary(typeSpecifier, summary)
@@ -598,7 +598,8 @@ def registerTypeSynthetic(category, typeName, cls, typeNameIsRegularExpression=F
     '''Register a synthetic provider for a type.'''
     typeSpecifier = lldb.SBTypeNameSpecifier(typeName, typeNameIsRegularExpression)
     typeSynthetic = lldb.SBTypeSynthetic().CreateWithClassName("%s.%s" %(__name__, cls.__name__))
-    typeSynthetic.SetOptions(options)
+    if options != None:
+        typeSynthetic.SetOptions(options)
     category.AddTypeSynthetic(typeSpecifier, typeSynthetic)
     #print("%s => %s" % (typeSpecifier, typeSynthetic))
     return typeSynthetic
