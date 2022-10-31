@@ -318,10 +318,10 @@ def qstring_summary(valobj: lldb.SBValue, idict, options):
 def qstring_summary(valobj: lldb.SBValue, idict, options):
     type = valobj.GetType().GetBasicType(lldb.eBasicTypeChar16)
     d = valobj.GetNonSyntheticValue().GetChildMemberWithName('d')
-    addr = d.AddressOf().Dereference().unsigned
+    size = d.GetChildMemberWithName('size').unsigned
+    addr = d.unsigned
     offset = d.GetChildMemberWithName('offset').unsigned
     ptr = valobj.CreateValueFromAddress('test', addr+offset, type)
-    size = d.GetChildMemberWithName('size').unsigned
 
     if size == 0:
         return '""'
@@ -431,7 +431,7 @@ class QStringProvider:
             type = self.valobj.GetType().GetBasicType(lldb.eBasicTypeChar16)
 
             d = self.valobj.GetChildMemberWithName('d')
-            addr = d.AddressOf().Dereference().unsigned
+            addr = d.unsigned
             offset = d.GetChildMemberWithName('offset').unsigned
             ptr = self.valobj.CreateValueFromAddress('ptr', addr+offset, type).AddressOf()
             return ptr
@@ -495,7 +495,7 @@ def qstringview_summary(valobj: lldb.SBValue, idict, options):
 
     size = max(size, 0)
 
-    addr = data.AddressOf().Dereference().unsigned
+    addr = data.unsigned
     ptr = valobj.CreateValueFromAddress('test', addr, type)
 
     return '"%s"' % stringFromSummary(ptr.AddressOf().summary)[:size]
