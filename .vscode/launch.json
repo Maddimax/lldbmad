@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug Test",
+            "program": "${command:cmake.launchTargetPath}",
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "CMake: build",
+            // "sourceMap": {"/Users/qt/work/qt": "/Users/mtillmanns/Qt/6.3.1/Src"}
+            //,"initCommands": ["command source ~/.lldbinit"]
+        }
+    ]
+}

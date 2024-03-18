@@ -70,6 +70,7 @@ void qMap()
     QMap<QString, QMap<QString, int>> testMap;
     QMap<QString, int> testiMap;
     testiMap["1"] = 1;
+    chk(); // CHECK("testiMap", 'size=1', {'["1"]': {"first": "\"1\"", "second": 1} })
     testMap["key"] = testiMap;
     QVariant mapVar = QVariant::fromValue(testMap);
     QMap<QString, float> floatMap;
@@ -83,9 +84,13 @@ void qVariant()
 {
     QVariant emptyVar;
     QVariant intVar(1234);
+    chk(); // CHECK_SUMMARY("intVar", '([int] = 1234)')
     QVariant floatVar(0.1234);
+    chk(); // CHECK_SUMMARY("floatVar", '([double] = 0.1234)')
     QVariant stringVar(QString("Hallo Welt! Ihr bubbas seid ja mal blah blah blah blah blah blah blah"));
+    chk(); // CHECK_SUMMARY("stringVar", '([QString] = "Hallo Welt! Ihr bubbas seid ja mal blah blah blah blah blah blah blah")')
     QVariant byteVar(QByteArray("awfoiaf\1oaw\2hifafohwaof"));
+    chk(); // CHECK_SUMMARY("byteVar", '([QByteArray] = size=23)')
 
     intVar = "Hallo Welt du int";
 
