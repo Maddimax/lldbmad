@@ -5,8 +5,10 @@ import os
 
 # Create a new debugger instance
 debugger = lldb.SBDebugger.Create()
-debugger.SkipAppInitFiles(True)
-debugger.SkipLLDBInitFiles(True)
+if "SkipAppInitFiles" in dir(debugger):
+    debugger.SkipAppInitFiles(True)
+if "SkipLLDBInitFiles" in dir(debugger):
+    debugger.SkipLLDBInitFiles(True)
 
 debugger.HandleCommand('command script import lldbmad.py')
 
