@@ -1,10 +1,21 @@
+import lldb
 import sys
-from lldb import debugger
 import os
 
-print('IMPORTING ...')
 
-def check(value, expr, expected):
+# Create a new debugger instance
+debugger = lldb.SBDebugger.Create()
+debugger.SkipAppInitFiles(True)
+debugger.SkipLLDBInitFiles(True)
+
+debugger.HandleCommand('command script import lldbmad.py')
+
+# When we step or continue, don't return from the function until the process
+# stops. We do this by setting the async mode to false.
+debugger.SetAsync (False)
+
+
+def check(debugger, value, expr, expected):
     target = debugger.GetSelectedTarget()
     print('\t"%s" => (should be "%s")' % (expr, expected))
 
@@ -22,7 +33,7 @@ def check(value, expr, expected):
             if child.TypeIsPointerType():
                 child = child.Dereference()
             
-            check(child, "%s.%s" % (expr, child.name), expected[k])
+            check(debugger, child, "%s.%s" % (expr, child.name), expected[k])
 
     elif isinstance(expected, str) and value.summary != expected:
         raise Exception('\t\tFAILED: Expected "%s" = "%s", got "%s" = "%s"' % (expr, expected, expr, value.summary))
@@ -31,9 +42,9 @@ def check(value, expr, expected):
 
 
 def CHECK_SUMMARY(expression, expected_summary):
+    global debugger
     target = debugger.GetSelectedTarget()
     currentFrame = target.GetProcess().GetSelectedThread().GetSelectedFrame()
-    print('Current frame: %s' % currentFrame)
     print('\tChecking summary ... ("%s")' % expression, flush=True)
 
     try:
@@ -42,7 +53,7 @@ def CHECK_SUMMARY(expression, expected_summary):
             print('!! Could not find variable by name "%s"' % expression)
             return False
 
-        check(value, expression, expected_summary)
+        check(debugger, value, expression, expected_summary)
         print('\t\tPASSED')
         return True
     except Exception as e:
@@ -51,9 +62,10 @@ def CHECK_SUMMARY(expression, expected_summary):
 
 
 def CHECK_CHILDREN(expression, expected_children):
+    global debugger
+
     target = debugger.GetSelectedTarget()
     currentFrame = debugger.GetSelectedTarget().GetProcess().GetSelectedThread().GetSelectedFrame()
-    print('Current frame: %s' % currentFrame)
     print('\tChecking children ... ("%s")' % expression, flush=True)
 
     try:
@@ -62,7 +74,7 @@ def CHECK_CHILDREN(expression, expected_children):
             print('!! Could not find variable by name "%s"' % expression)
             return False
 
-        check(value, expression, expected_children)
+        check(debugger, value, expression, expected_children)
         print('\t\tPASSED')
         return True
     except Exception as e:
@@ -72,56 +84,96 @@ def CHECK_CHILDREN(expression, expected_children):
 def CHECK(expression, expected_summary, expected_children):
     return CHECK_SUMMARY(expression, expected_summary) and CHECK_CHILDREN(expression, expected_children)
 
-activeBp = 0
-numBp = 0
-
-bp = []
-cmds = []
 def read_source():
-    global bp
+    breakPoints = []
+    cmds = []
 
     target = debugger.GetSelectedTarget()
 
     print("Reading source ...")
     with open('test-app/main.cpp', 'r') as f:
-        lineNumber = 1
+        lineNumber = 0
         for line in f:
+            lineNumber = lineNumber+1
             if "// CHECK" in line:
                 line = line[line.index("// CHECK") + len("// "):].strip('\r\n')
-                print("Found check in line %i: %s" % (lineNumber, line))
-
                 # Create a breakpoint at the line
                 breakpoint = target.BreakpointCreateByLocation('main.cpp', lineNumber)
                 breakpoint.SetAutoContinue(False)
-                breakpoint.SetEnabled(activeBp == bp)
-                bp.append(breakpoint)
+                breakpoint.SetEnabled(False)
+
+                if breakpoint.GetNumLocations() == 0:
+                    print("Could not create breakpoint at line %i" % lineNumber)
+                    continue
+                if breakpoint.GetNumLocations() > 1:
+                    print("Warning: Multiple locations for breakpoint at line %i, Ignoring..." % lineNumber)
+                    continue
+                location = breakpoint.GetLocationAtIndex(0)
+                if location.GetAddress().GetLineEntry().GetLine() != lineNumber:
+                    print("Warning: Breakpoint at line %i is at line %i, Ignoring..." % (lineNumber, location.GetAddress().GetLineEntry().GetLine()))
+                    continue
+                print("Found check in line %i: %s" % (lineNumber, line))
+
+                breakpoint.SetEnabled(True)
+                breakPoints.append(breakpoint)
                 cmds.append((line, lineNumber))
-            lineNumber = lineNumber+1
 
     print("Done reading source.")
-    print()
+    return (breakPoints, cmds)
 
-read_source()
 
-debugger.SetAsync(False)
+def do_check(process, cmds):
+    state = process.GetState()
 
-for i in range(0, len(bp)):
-    print('RUN (%i/%i)' %(i, len(bp)), flush=True)
-    bp[i].SetEnabled(True)
-    debugger.HandleCommand('r')
-    if debugger.GetSelectedTarget().GetProcess().GetState() == 5:
-        # We have stopped at the breakpoint ...
-        expectedLine = cmds[i][1]
-        actualLine = debugger.GetSelectedTarget().GetProcess().GetSelectedThread().GetSelectedFrame().GetLineEntry().GetLine()
-        print('\tExpected line %i, actual line %i' % (expectedLine, actualLine))
-        if expectedLine == actualLine:
-            if not eval(cmds[i][0]):
-                break
-        else:
-            print('Stopped in wrong location, continuing ...')
+    if state == lldb.eStateExited:
+        print('Process exited??')
+        return False
 
-    bp[i].SetEnabled(False)
-    print('DONE', flush=True)
+    if state != lldb.eStateStopped:
+        print('Process is not stopped, but in state %i' % state)
+        return False
 
-#debugger.HandleCommand('exit')
+    currentFrame = process.GetSelectedThread().GetSelectedFrame()
+    print('Current frame: %s' % currentFrame)
 
+    cmd = next(cmd for cmd in cmds if cmd[1] == currentFrame.GetLineEntry().GetLine())
+
+    if not cmd:
+        print('Could not find command for line %i' % actualLine)
+        return False
+
+    if not eval(cmd[0]):
+        return False
+    
+    return True
+
+def main(args):
+    # Create a target from a file and arch
+    print('Creating a target for "%s"' % args[0])
+
+    target = debugger.CreateTargetWithFileAndArch (args[0], lldb.LLDB_ARCH_DEFAULT)
+
+    if not target:
+        print('Error creating target')
+        return 1
+
+    bps, cmds = read_source()
+
+    if len(bps) == 0:
+        print('No checks found in source')
+        return 1
+
+    print("Starting process ...")
+    process = target.LaunchSimple (None, None, os.getcwd())
+
+    for i in range(0, len(bps)):
+        print('RUN (%i/%i)' %(i, len(bps)), flush=True)
+        if not do_check(process, cmds):
+            return 2
+
+        process.Continue()
+
+    return 0
+
+if __name__ == '__main__':
+    exit(main(sys.argv[1:]))

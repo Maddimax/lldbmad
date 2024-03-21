@@ -6,24 +6,11 @@ endif()
 
 message(STATUS "Lldb path: ${LLDB_PATH}")
 
+execute_process(COMMAND ${LLDB_PATH} -P OUTPUT_VARIABLE LLDB_PYTHON_PATH OUTPUT_STRIP_TRAILING_WHITESPACE)
+
 add_test(
     NAME lldb-dumpers 
-    COMMAND ${LLDB_PATH} 
-        $<TARGET_FILE:lldbtest>
-        --no-lldbinit
-        --one-line "command script import ${CMAKE_CURRENT_SOURCE_DIR}/lldbmad.py"
-        --one-line "command script import ${CMAKE_CURRENT_SOURCE_DIR}/tests/test.py"
-        -o quit
+    COMMAND xcrun python3 tests/test.py $<TARGET_FILE:lldbtest>
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
-
-add_custom_target(check 
-    COMMAND 
-        ${LLDB_PATH} 
-        $<TARGET_FILE:lldbtest>
-        --no-lldbinit
-        --one-line "command script import ${CMAKE_CURRENT_SOURCE_DIR}/../lldbmad.py"
-        --one-line "command script import ${CMAKE_CURRENT_SOURCE_DIR}/test.py"
-        -o quit
-    DEPENDS lldbtest
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..)
+set_tests_properties(lldb-dumpers PROPERTIES ENVIRONMENT "PYTHONPATH=${LLDB_PYTHON_PATH}")
