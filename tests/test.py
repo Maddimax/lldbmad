@@ -163,7 +163,7 @@ def main(args):
 
     if len(bps) == 0:
         print('No checks found in source')
-        return 1
+        return 2
 
     print("Starting process ...")
     process = target.LaunchSimple (None, None, os.getcwd())
@@ -171,11 +171,14 @@ def main(args):
     for i in range(0, len(bps)):
         print('RUN (%i/%i)' %(i, len(bps)), flush=True)
         if not do_check(process, cmds):
-            return 2
+            return 3
 
         process.Continue()
 
     return 0
 
 if __name__ == '__main__':
-    exit(main(sys.argv[1:]))
+    exitCode = main(sys.argv[1:])
+    if exitCode != 0:
+        print('FAILED', exitCode)
+        exit(exitCode)
