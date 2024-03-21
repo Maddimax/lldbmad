@@ -11,6 +11,14 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v2
+        with:
+          version:      6.6.0
+          host:         mac
+          target:       desktop
+          dir:          ${{ runner.temp }}
+          setup-python: false
       - name: Run build-wrapper
         run: |
           mkdir build
