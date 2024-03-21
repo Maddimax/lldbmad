@@ -1,0 +1,19 @@
+name: Build
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+jobs:
+  build:
+    name: Build
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run build-wrapper
+        run: |
+          mkdir build
+          cmake -S . -B build
+      - name: Run tests
+        run: cd build && ctest -C Debug --output-on-failure
