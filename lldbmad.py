@@ -602,6 +602,66 @@ def qjsonobject_summary(valobj: lldb.SBValue, idict, options):
     return "size=%i" % numElements
 
 
+
+class KeySequenceChildProvider:
+    def __init__(self, valobj, idict):
+        self.valobj = valobj
+        self.numElements = 0
+
+    def hasChildren(self):
+        return self.numElements > 0
+
+    def num_children(self):
+        return self.numElements
+
+    def get_child_at_index(self, index):
+        if index < self.numElements:
+            child = self.valobj.EvaluateExpression('operator[](%i)' % index, lldb.SBExpressionOptions(), "[%i]" % index)
+            return child
+        return nil
+
+    def update(self):
+        self.numElements = self.valobj.EvaluateExpression('count()').GetValueAsSigned()
+
+@output_exceptions
+def qkeysequence_summary(valobj: lldb.SBValue, idict, options):
+    seq = stringFromSummary(
+        valobj.EvaluateExpression('toString(QKeySequence::SequenceFormat::PortableText)')
+            .GetSummary())
+    if len(seq) == 0:
+        return "<empty>"
+
+    return "\"%s\"" % (seq)
+
+@output_exceptions
+def qkeycombination_summary(valobj: lldb.SBValue, idict, options):
+    summary = []
+
+    c = valobj.GetChildMemberWithName('combination').GetValueAsSigned()
+    key = c & ~0xfe000000
+    mod = c & 0xfe000000
+    
+    target = lldb.debugger.GetSelectedTarget()
+
+    if key != 0:
+        keyName = ""
+        keyType = target.FindFirstType('Qt::Key')
+        if keyType:
+            members = keyType.GetEnumMembers()
+            keyName = next(k for k in members if k.signed == key).name
+        summary.append("key=%s (%s)" % (keyName, hex(key)))
+
+    if mod != 0:
+        modNames = ""
+        modType = target.FindFirstType('Qt::KeyboardModifier')
+        if modType:
+            members = modType.GetEnumMembers()
+            mods = filter((lambda m: m.signed & mod and m.name != "KeyboardModifierMask"), members)
+            modNames = " & ".join(m.name for m in mods)
+        summary.append("mod=%s (%s)" % (modNames, hex(mod)))
+
+    return ", ".join(summary)
+
 @output_exceptions
 def qtc_filepath_summary(valobj: lldb.SBValue, idict, options):
     mData = valobj.GetChildMemberWithName('m_data')
@@ -788,6 +848,11 @@ def __lldb_init_module(debugger, dict):
 
     registerTypeSummary(madCategory, "QJsonObject", qjsonobject_summary)
     registerTypeSynthetic(madCategory, "QJsonObject", JsonObjectChildProvider)
+
+    registerTypeSummary(madCategory, "QKeyCombination", qkeycombination_summary)
+
+    registerTypeSummary(madCategory, "QKeySequence", qkeysequence_summary)
+    registerTypeSynthetic(madCategory, "QKeySequence", KeySequenceChildProvider)
 
     ################################################################################
     # Qt Creator extensions
