@@ -21,6 +21,8 @@
 #include <QJsonObject>
 #include <QJsonValue>
 
+#include <QKeySequence>
+
 #include <vector>
 
 void chk() {}
@@ -29,7 +31,7 @@ void qString()
 {
     QStringList test({"Hallo", "Welt"});
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-    chk(); // CHECK("test", None, {'[0]': '"Hallo"', '[1]': '"Welt"'})
+    chk(); // CHECK("test", "size=2", {'[0]': '"Hallo"', '[1]': '"Welt"'})
 #else
     chk(); // CHECK("test", None, { 0: {'[0]': '"Hallo"', '[1]': '"Welt"'}})
 #endif
@@ -198,6 +200,24 @@ void qList()
     chk(); // CHECK("someComplexTypes", 'size=2', {'[0]': {"first": 2, "second": '"two"'}, '[1]': {"first": 3, "second": '"three"'}})
 }
 
+void qKeySequence()
+{
+    QKeySequence empty;
+    QKeySequence simple(Qt::Key_A);
+    QKeySequence complex(Qt::Key_A, Qt::ControlModifier);
+    QKeySequence moreComplex("Ctrl+K, Ctrl+F");
+    QKeySequence superComplex("Ctrl+Shift+K, Ctrl+Alt+F");
+
+
+    Qt::Key k = Qt::Key_A;
+
+    chk(); // CHECK_SUMMARY("empty", '<empty>')
+    chk(); // CHECK_SUMMARY("simple", '"A"')
+    chk(); // CHECK_SUMMARY("complex", '"A, Ctrl+"')
+    chk(); // CHECK_SUMMARY("moreComplex", '"Ctrl+K, Ctrl+F"')
+    chk(); // CHECK_SUMMARY("superComplex", '"Ctrl+Shift+K, Ctrl+Alt+F"')
+}
+
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
@@ -214,6 +234,7 @@ int main(int argc, char *argv[])
     qObject();
     qString();
     qList();
+    qKeySequence();
 
     float floatValue = 1.0f;
 
