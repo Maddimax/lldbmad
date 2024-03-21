@@ -20,9 +20,9 @@ jobs:
           dir:          ${{ runner.temp }}
           setup-python: false
           cache:        true
-      - name: Run build-wrapper
+      - name: Build
         run: |
           mkdir build
           cmake -S . -B build
-      - name: Run tests
+      - name: Test
         run: cd build && ctest -C Debug --output-on-failure
